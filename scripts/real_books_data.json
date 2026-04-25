@@ -1,0 +1,28 @@
+{
+  "books": [
+    {
+      "title": "斗破苍穹",
+      "author": "天蚕土豆",
+      "chapters": [],
+      "error": "Book not found on site"
+    },
+    {
+      "title": "凡人修仙传",
+      "author": "忘语",
+      "chapters": [],
+      "error": "No chapters found"
+    },
+    {
+      "title": "诡秘之主",
+      "author": "爱潜水的乌贼",
+      "chapters": [],
+      "error": "Book not found on site"
+    },
+    {
+      "title": "全职高手",
+      "author": "蝴蝶蓝",
+      "chapters": [],
+      "error": "Book not found on site"
+    }
+  ]
+}

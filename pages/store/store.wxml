@@ -1,0 +1,34 @@
+<!-- pages/store/store.wxml -->
+<view class="container">
+
+  <!-- 分类 Tab 栏 -->
+  <view class="tab-bar">
+    <view
+      class="tab-item {{currentTab === index ? 'tab-active' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="*this"
+      bindtap="onTabChange"
+      data-index="{{index}}"
+    >
+      {{item}}
+    </view>
+  </view>
+
+  <!-- 书籍双栏列表 -->
+  <view class="book-grid">
+    <view class="book-item" wx:for="{{books}}" wx:key="id" bindtap="onBookTap" data-id="{{item.id}}">
+      <view class="book-cover cover-placeholder" style="background: {{item.coverColor}};">
+        {{item.title}}
+      </view>
+      <view class="book-info">
+        <text class="book-title ellipsis">{{item.title}}</text>
+        <text class="book-author">{{item.author}}</text>
+        <view class="book-meta">
+          <text class="book-score">{{item.score}}分</text>
+          <text class="book-price">{{item.chapterPrice}}金币/章</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+</view>

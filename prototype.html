@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookstore · Pocket Booklet</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #E8E4DF; }
+  .fade-in { animation: fadeIn 0.45s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+  .hide-scroll::-webkit-scrollbar { display: none; }
+  .drop-cap::first-letter {
+    float: left;
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 3.2em;
+    line-height: 0.78;
+    padding-right: 6px;
+    padding-top: 2px;
+    font-weight: 700;
+    color: #B8451A;
+  }
+  .letterpress {
+    font-family: 'Newsreader', Georgia, serif;
+    color: #1A1A1A;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.5), 0 -1px 0 rgba(0,0,0,0.08);
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .cursor-blink { animation: blink 1.1s step-end infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+/* ========== DATA ========== */
+const COVERS = ['#C75B3A','#2D6A4F','#5B4A8C','#B8451A','#1A5F7A','#8B5E3C','#4A6741','#7B3F5F','#3D5A80','#9C6644'];
+const BOOKS = [
+  { id:1, title:'长安十二时辰', author:'马伯庸', category:'历史', summary:'唐朝长安城上元节当日，死囚张小敬必须在十二时辰内拯救长安。权谋、悬疑与古都风貌交织。', freeChapters:3, chapterPrice:15, chapterCount:120, score:9.2, coverIdx:0 },
+  { id:2, title:'三体', author:'刘慈欣', category:'科幻', summary:'文化大革命期间一次秘密军事工程，向宇宙发出地球的第一声啼鸣。四光年外的三体文明正艰难生存。', freeChapters:5, chapterPrice:10, chapterCount:90, score:9.6, coverIdx:2 },
+  { id:3, title:'活着', author:'余华', category:'文学', summary:'福贵的一生见证了二十世纪中国的苦难与坚韧。从大富大贵到家破人亡，活着本身就是意义。', freeChapters:2, chapterPrice:8, chapterCount:60, score:9.4, coverIdx:1 },
+  { id:4, title:'明朝那些事儿', author:'当年明月', category:'历史', summary:'从朱元璋到崇祯，明朝二百七十六年的兴衰沉浮。历史可以写得很好看。', freeChapters:4, chapterPrice:12, chapterCount:200, score:9.0, coverIdx:3 },
+  { id:5, title:'流浪地球', author:'刘慈欣', category:'科幻', summary:'太阳即将毁灭，人类在地球表面建造上万座发动机和转向发动机，带着地球逃离太阳系。', freeChapters:3, chapterPrice:10, chapterCount:80, score:9.1, coverIdx:6 },
+  { id:6, title:'围城', author:'钱钟书', category:'文学', summary:'方鸿渐的人生困境：婚姻是一座围城，城外的人想进去，城里的人想出来。', freeChapters:2, chapterPrice:8, chapterCount:50, score:9.3, coverIdx:7 },
+  { id:7, title:'白夜行', author:'东野圭吾', category:'悬疑', summary:'一个绝望的爱与救赎的故事。亮司与雪穗在黑暗中同行十九年，却永远无法在阳光下牵手。', freeChapters:3, chapterPrice:14, chapterCount:110, score:9.5, coverIdx:4 },
+  { id:8, title:'人类简史', author:'尤瓦尔·赫拉利', category:'社科', summary:'从认知革命到农业革命，再到科学革命，人类如何从非洲角落的弱小物种主宰地球。', freeChapters:4, chapterPrice:12, chapterCount:95, score:9.2, coverIdx:8 },
+];
+function genChapters(book) {
+  const chapters = [];
+  const isFree = Math.min(book.freeChapters, 5);
+  for (let i=1; i<=Math.min(book.chapterCount,12); i++) {
+    const paragraphs = [];
+    for (let p=0; p<3+Math.floor(Math.random()*4); p++) {
+      paragraphs.push('这是第'+i+'章的内容段落。此处展示阅读器的排版效果。'.repeat(2+Math.floor(Math.random()*3)));
+    }
+    chapters.push({ id:i, title:'第'+i+'章', content:paragraphs.join('\n\n'), isPremium:!isFree || i>isFree });
+  }
+  return chapters;
+}
+
+/* ========== DESIGN SYSTEM ========== */
+const serif = "'Newsreader', Georgia, 'Noto Serif SC', serif";
+const sans = "'Inter', -apple-system, sans-serif";
+const mono = "'SF Mono', 'Fira Code', 'Courier New', monospace";
+const s = {
+  // Paper & Ink
+  paper: '#FAF8F5',
+  paperDark: '#141210',
+  ink: '#1A1A1A',
+  inkMuted: '#6B6560',
+  inkLight: '#A39E99',
+  inkDarkMode: '#D4CFC9',
+  // Accent
+  rust: '#B8451A',
+  rustLight: '#F5E8E0',
+  // Structure
+  rule: '#D4CFC9',
+  ruleLight: '#E8E4DF',
+  // Layout
+  pagePad: { paddingLeft: 20, paddingRight: 20 },
+};
+const ios = {
+  wrapper: { display:'inline-block', padding:12, background:'#000', borderRadius:60, boxShadow:'0 0 0 2px #1f2937, 0 20px 60px rgba(0,0,0,0.3)', position:'relative' },
+  screen: { position:'relative', borderRadius:48, overflow:'hidden', background:s.paper },
+  statusBar: { position:'absolute', top:0, left:0, right:0, height:54, display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 32px', fontSize:16, fontWeight:600, fontFamily:sans, zIndex:20, pointerEvents:'none' },
+  island: { position:'absolute', top:12, left:'50%', transform:'translateX(-50%)', width:124, height:36, background:'#000', borderRadius:999, zIndex:30 },
+  content: { position:'absolute', top:54, left:0, right:0, bottom:84, overflow:'auto' },
+  homeBar: { position:'absolute', bottom:10, left:'50%', transform:'translateX(-50%)', width:140, height:5, background:'rgba(0,0,0,0.25)', borderRadius:999, zIndex:10 },
+};
+
+/* ========== HELPERS ========== */
+function Stars({ score }) {
+  const n = Math.round(score / 2);
+  return <span style={{fontSize:11,color:'#B8451A',letterSpacing:1}}>{'★'.repeat(n)}{'☆'.repeat(5-n)}</span>;
+}
+function ChapterNum({ num, label }) {
+  const romans = ['I','II','III','IV','V','VI','VII','VIII'];
+  return <div style={{fontFamily:mono,fontSize:10,color:s.rust,letterSpacing:'0.15em',textTransform:'uppercase',marginBottom:6}}>{romans[num-1]} · {label}</div>;
+}
+function Folio({ left, right }) {
+  return (
+    <div style={{display:'flex',justifyContent:'space-between',padding:'12px 20px',fontFamily:mono,fontSize:9,color:s.inkLight,letterSpacing:'0.08em',borderTop:`0.5px solid ${s.rule}`,marginTop:'auto'}}>
+      <span>{left}</span>
+      <span>{right}</span>
+    </div>
+  );
+}
+function LedgerItem({ date, title, subtitle, tag, onClick }) {
+  return (
+    <div onClick={onClick} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:`0.5px solid ${s.rule}`,cursor:'pointer',alignItems:'baseline'}}>
+      <div style={{fontFamily:mono,fontSize:10,color:s.inkLight,width:44,flexShrink:0}}>{date}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:serif,fontSize:15,fontWeight:600,color:s.ink,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{title}</div>
+        {subtitle && <div style={{fontSize:11,color:s.inkMuted,marginTop:2,fontFamily:sans}}>{subtitle}</div>}
+      </div>
+      {tag && <div style={{fontSize:9,fontFamily:mono,color:s.rust,background:s.rustLight,padding:'2px 6px',borderRadius:2,flexShrink:0}}>{tag}</div>}
+    </div>
+  );
+}
+function Terminal({ lines }) {
+  return (
+    <div style={{background:s.ink,borderRadius:6,padding:'14px 16px',fontFamily:mono,fontSize:11,lineHeight:1.8}}>
+      {lines.map((l,i)=>(
+        <div key={i} style={{color: i===lines.length-1 ? '#E8E4DF' : '#6B6560'}}>
+          {l}{i===lines.length-1 && <span className="cursor-blink">▌</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ========== TAB BAR ========== */
+function TabBar({ active, onChange }) {
+  const tabs = [
+    { key:'home', label:'发现' },
+    { key:'store', label:'书城' },
+    { key:'shelf', label:'书架' },
+    { key:'me', label:'我的' },
+  ];
+  return (
+    <div style={{position:'absolute',bottom:34,left:0,right:0,height:50,background:s.paper,borderTop:`0.5px solid ${s.rule}`,display:'flex',alignItems:'center',justifyContent:'space-around',zIndex:20}}>
+      {tabs.map(t=>{
+        const isActive = active===t.key;
+        return (
+          <div key={t.key} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,cursor:'pointer',padding:'4px 16px'}} onClick={()=>onChange(t.key)}>
+            <span style={{fontFamily:serif,fontSize:isActive?14:13,fontWeight:isActive?700:400,color:isActive?s.rust:s.inkLight,letterSpacing:'0.05em'}}>{t.label}</span>
+            {isActive && <div style={{width:12,height:2,background:s.rust,borderRadius:1}} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ========== SCREENS ========== */
+function HomeScreen({ onBook }) {
+  const picks = BOOKS.slice(0,5);
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'20px 20px 16px'}}>
+        <ChapterNum num={1} label="发现" />
+        <h1 className="letterpress" style={{fontFamily:serif,fontSize:28,lineHeight:1.15,margin:'4px 0 12px',fontWeight:700}}>在书页间<br/>发现的方法。</h1>
+        <p className="drop-cap" style={{fontFamily:serif,fontSize:14,lineHeight:1.7,color:s.inkMuted,margin:0}}>
+          精选好书，按章节付费解锁。让阅读回归本质，每一章都物有所值。
+        </p>
+      </div>
+      <div style={{padding:'0 20px'}}>
+        <div style={{fontFamily:mono,fontSize:9,color:s.inkLight,letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:10}}>热门榜单</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px 10px'}}>
+          {picks.map((b,i)=>[
+            <div key={b.id} onClick={()=>onBook(b)} style={{cursor:'pointer'}}>
+              <div style={{position:'relative'}}>
+                <div style={{width:'100%',aspectRatio:'3/4',borderRadius:6,background:COVERS[b.coverIdx],overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}} />
+                <div style={{position:'absolute',top:6,left:6,minWidth:18,height:18,borderRadius:i<3?3:999,background:i<3?'#C9A227':'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px',fontSize:10,fontWeight:800,color:'#fff',fontFamily:sans}}>{i+1}</div>
+              </div>
+              <div style={{fontFamily:serif,fontSize:13,fontWeight:600,color:s.ink,marginTop:6,lineHeight:1.3,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{b.title}</div>
+              <div style={{fontSize:10,color:s.inkMuted,marginTop:2,fontFamily:sans}}>{b.author}</div>
+            </div>
+          ])}
+        </div>
+      </div>
+      <Folio left="- 001 -" right="发现 · 5 BOOKS" />
+    </div>
+  );
+}
+function StoreScreen({ onBook }) {
+  const [cat, setCat] = React.useState('all');
+  const [rankTab, setRankTab] = React.useState('rec');
+  const cats = [{key:'all',label:'全部'},{key:'hot',label:'热门'},{key:'rec',label:'推荐'},{key:'new',label:'新书'}];
+  const ranks = [{key:'rec',label:'推荐榜'},{key:'done',label:'完本榜'},{key:'peak',label:'巅峰榜'},{key:'new',label:'新书榜'}];
+  let filtered = BOOKS;
+  if (cat !== 'all') {
+    filtered = filtered.filter(b => cat==='hot' ? b.score>=9.2 : cat==='rec' ? b.score>=9.0 : b.id>5);
+  }
+  const featured = BOOKS[0];
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'16px 20px 12px'}}>
+        <ChapterNum num={2} label="书城" />
+        <div style={{display:'flex',gap:10,marginTop:8,alignItems:'center'}}>
+          <div style={{flex:1,display:'flex',alignItems:'center',gap:8,background:s.ruleLight,borderRadius:8,padding:'9px 12px'}}>
+            <span style={{fontSize:13,color:s.inkLight}}>🔍</span>
+            <span style={{fontSize:12,color:s.inkLight,fontFamily:sans}}>搜索书名或作者</span>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,cursor:'pointer',padding:'4px'}}>
+            <span style={{fontSize:14}}>☰</span>
+            <span style={{fontSize:9,color:s.inkMuted,fontFamily:sans}}>分类</span>
+          </div>
+        </div>
+      </div>
+      <div className="hide-scroll" style={{display:'flex',gap:8,padding:'0 20px 8px',overflowX:'auto'}}>
+        {cats.map(t=>{
+          const active = cat===t.key;
+          return <div key={t.key} onClick={()=>setCat(t.key)} style={{padding:'5px 14px',borderRadius:999,fontSize:12,fontFamily:sans,fontWeight:active?600:400,background:active?s.rustLight:'transparent',color:active?s.rust:s.inkMuted,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,border:`0.5px solid ${active?s.rust:s.rule}`}}>{t.label}</div>;
+        })}
+      </div>
+      <div className="hide-scroll" style={{display:'flex',gap:16,padding:'8px 20px',overflowX:'auto',borderBottom:`0.5px solid ${s.rule}`}}>
+        {ranks.map(t=>{
+          const active = rankTab===t.key;
+          return <div key={t.key} onClick={()=>setRankTab(t.key)} style={{fontSize:13,fontFamily:sans,fontWeight:active?700:400,color:active?s.ink:s.inkMuted,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,paddingBottom:6,borderBottom:active?`2px solid ${s.rust}`:'2px solid transparent'}}>{t.label}</div>;
+        })}
+        <div style={{fontSize:12,color:s.inkLight,fontFamily:sans,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0,display:'flex',alignItems:'center',gap:2}}>完整榜单 ›</div>
+      </div>
+      <div style={{padding:'14px 20px',flex:1}}>
+        {filtered.map((b,i)=>[
+          <div key={b.id} onClick={()=>onBook(b)} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:`0.5px solid ${s.rule}`,cursor:'pointer',alignItems:'flex-start'}}>
+            <div style={{position:'relative',flexShrink:0}}>
+              <div style={{width:72,height:96,borderRadius:5,background:COVERS[b.coverIdx],overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}} />
+              <div style={{position:'absolute',top:4,left:4,minWidth:16,height:16,borderRadius:i<3?3:999,background:i<3?'#C9A227':'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:'0 3px',fontSize:9,fontWeight:800,color:'#fff',fontFamily:sans}}>{i+1}</div>
+            </div>
+            <div style={{flex:1,minWidth:0,paddingTop:2}}>
+              <div style={{fontFamily:serif,fontSize:15,fontWeight:700,color:s.ink,lineHeight:1.3}}>{b.title}</div>
+              <div style={{fontSize:12,color:s.inkMuted,marginTop:4,fontFamily:sans}}>{b.author} · {b.category}</div>
+              <div style={{fontSize:11,color:s.inkLight,marginTop:6,lineHeight:1.5,fontFamily:sans,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{b.summary}</div>
+              <div style={{marginTop:6,display:'flex',alignItems:'center',gap:6}}>
+                {b.score>=9.0 && <span style={{fontSize:10,color:'#C9A227',fontWeight:600,fontFamily:sans}}>★ {b.score}</span>}
+                {b.freeChapters>0 && <span style={{fontSize:9,color:s.rust,background:s.rustLight,padding:'2px 5px',borderRadius:2,fontFamily:mono}}>免费{b.freeChapters}章</span>}
+              </div>
+            </div>
+          </div>
+        ])}
+      </div>
+      <div style={{padding:'0 20px 16px'}}>
+        <div onClick={()=>onBook(featured)} style={{display:'flex',gap:12,cursor:'pointer',padding:'12px',background:s.ruleLight,borderRadius:8}}>
+          <div style={{width:72,height:96,borderRadius:5,background:COVERS[featured.coverIdx],flexShrink:0,boxShadow:'0 2px 8px rgba(0,0,0,0.08)'}} />
+          <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',justifyContent:'center'}}>
+            <div style={{fontFamily:serif,fontSize:15,fontWeight:700,color:s.ink}}>{featured.title}</div>
+            <div style={{fontSize:11,color:s.inkMuted,marginTop:3,fontFamily:sans}}>{featured.author} · {featured.category}</div>
+            <div style={{marginTop:6,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:11,color:'#C9A227',fontWeight:700,fontFamily:sans}}>{featured.score}分</span>
+              <span style={{fontSize:10,color:s.rust,background:'rgba(184,69,26,0.08)',padding:'2px 6px',borderRadius:2,fontFamily:sans}}>巅峰榜NO.1 ›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <Folio left="- 002 -" right="书城 · BOOKS" />
+    </div>
+  );
+}
+
+function ShelfScreen({ onBook }) {
+  const myBooks = [BOOKS[0], BOOKS[3], BOOKS[5]];
+  const progress = [68, 32, 15];
+  const lastRead = ['2026-04-23','2026-04-20','2026-04-15'];
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'20px 20px 12px'}}>
+        <ChapterNum num={3} label="书架" />
+        <h1 className="letterpress" style={{fontFamily:serif,fontSize:24,lineHeight:1.2,margin:'2px 0 0',fontWeight:700}}>尚未读完<br/>的想法。</h1>
+      </div>
+      <div style={{padding:'0 20px',flex:1}}>
+        {myBooks.map((b,i)=>[
+          <LedgerItem key={b.id} date={lastRead[i]} title={b.title} subtitle={`进度 ${progress[i]}% · 第${Math.floor(b.chapterCount*progress[i]/100)}章`} onClick={()=>onBook(b)} />,
+          <div key={`p-${b.id}`} style={{padding:'4px 0 10px',marginLeft:56}}>
+            <div style={{height:3,background:s.ruleLight,borderRadius:2,overflow:'hidden'}}>
+              <div style={{width:`${progress[i]}%`,height:'100%',background:s.rust,borderRadius:2}} />
+            </div>
+          </div>,
+        ]).flat()}
+      </div>
+      <Folio left="- 003 -" right="书架 · 3 READING" />
+    </div>
+  );
+}
+
+function MeScreen({ onRecharge }) {
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'20px 20px 16px'}}>
+        <ChapterNum num={4} label="我的" />
+        <h1 className="letterpress" style={{fontFamily:serif,fontSize:24,lineHeight:1.2,margin:'2px 0 12px',fontWeight:700}}>这里是<br/>你的账户。</h1>
+        <Terminal lines={['$ whoami','reader']} />
+      </div>
+      <div style={{padding:'0 20px',flex:1}}>
+        <div style={{fontFamily:mono,fontSize:9,color:s.inkLight,letterSpacing:'0.1em',textTransform:'uppercase',margin:'16px 0 8px'}}>账户</div>
+        {[{label:'金币余额',value:'1,240 金币',action:'充值',onClick:onRecharge},{label:'VIP状态',value:'普通用户'},{label:'阅读时长',value:'128 小时'},{label:'已购章节',value:'86 章'}].map((item,i)=>[
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderBottom:`0.5px solid ${s.rule}`}}>
+            <span style={{fontSize:13,color:s.inkMuted,fontFamily:sans}}>{item.label}</span>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:13,color:s.ink,fontWeight:600,fontFamily:sans}}>{item.value}</span>
+              {item.action && <span onClick={item.onClick} style={{fontSize:11,color:s.rust,cursor:'pointer',fontFamily:sans}}>{item.action}</span>}
+            </div>
+          </div>
+        ])}
+        <div style={{fontFamily:mono,fontSize:9,color:s.inkLight,letterSpacing:'0.1em',textTransform:'uppercase',margin:'20px 0 8px'}}>设置</div>
+        {['阅读偏好','通知管理','清除缓存','关于我们'].map((label,i)=>[
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderBottom:`0.5px solid ${s.rule}`}}>
+            <span style={{fontSize:13,color:s.inkMuted,fontFamily:sans}}>{label}</span>
+            <span style={{fontSize:16,color:s.inkLight}}>›</span>
+          </div>
+        ])}
+      </div>
+      <Folio left="- 004 -" right="我的 · READER" />
+    </div>
+  );
+}
+
+function BookDetailScreen({ book, onBack, onRead }) {
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:6,borderBottom:`0.5px solid ${s.rule}`}}>
+        <span onClick={onBack} style={{fontSize:20,cursor:'pointer',padding:'4px 8px',fontFamily:serif,color:s.inkMuted}}>‹</span>
+        <span style={{fontSize:14,fontWeight:600,flex:1,textAlign:'center',fontFamily:sans}}>书籍详情</span>
+        <span style={{width:32}} />
+      </div>
+      <div style={{padding:'20px',display:'flex',gap:16,alignItems:'flex-start'}}>
+        <div style={{width:90,height:120,borderRadius:6,background:COVERS[book.coverIdx],flexShrink:0,boxShadow:'0 3px 10px rgba(0,0,0,0.08)'}} />
+        <div style={{flex:1}}>
+          <ChapterNum num={5} label="书目" />
+          <div style={{fontFamily:serif,fontSize:18,fontWeight:700,color:s.ink,lineHeight:1.3}}>{book.title}</div>
+          <div style={{fontSize:12,color:s.inkMuted,marginTop:4,fontFamily:sans}}>{book.author} · {book.category}</div>
+          <div style={{marginTop:8,display:'flex',alignItems:'center',gap:6}}>
+            <Stars score={book.score} />
+            <span style={{fontSize:12,color:s.inkMuted,fontFamily:sans}}>{book.score}</span>
+          </div>
+          {book.freeChapters>0?(
+            <span style={{display:'inline-block',marginTop:8,background:s.rustLight,color:s.rust,fontSize:10,padding:'3px 8px',borderRadius:2,fontFamily:mono}}>前{book.freeChapters}章免费</span>
+          ):<span style={{display:'inline-block',marginTop:8,background:s.ruleLight,color:s.inkMuted,fontSize:10,padding:'3px 8px',borderRadius:2,fontFamily:mono}}>{book.chapterPrice}金币/章</span>}
+        </div>
+      </div>
+      <div style={{padding:'0 20px'}}>
+        <div style={{fontSize:13,color:s.inkMuted,lineHeight:1.7,fontFamily:sans}}>{book.summary}</div>
+        <div style={{fontFamily:mono,fontSize:9,color:s.inkLight,letterSpacing:'0.1em',textTransform:'uppercase',margin:'16px 0 8px'}}>章节目录</div>
+        {genChapters(book).map((c,i)=>[
+          <div key={c.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:`0.5px solid ${s.rule}`}}>
+            <span style={{fontSize:13,color:s.ink,fontFamily:sans}}>{c.title}</span>
+            <span style={{fontSize:10,color:c.isPremium?s.rust:s.inkLight,fontFamily:mono}}>{c.isPremium?'付费':'免费'}</span>
+          </div>
+        ])}
+      </div>
+      <div style={{padding:'16px 20px',marginTop:'auto'}}>
+        <div onClick={onRead} style={{background:s.ink,color:s.paper,textAlign:'center',padding:'14px',borderRadius:6,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:sans}}>开始阅读</div>
+      </div>
+      <Folio left="- 005 -" right={`${book.title.slice(0,8)}…`} />
+    </div>
+  );
+}
+
+function ReaderScreen({ book, onBack, onRecharge }) {
+  const chs = genChapters(book);
+  const [ci, setCi] = React.useState(0);
+  const ch = chs[ci];
+  const goNext = () => { if (ci < chs.length-1) setCi(ci+1); };
+  const goPrev = () => { if (ci > 0) setCi(ci-1); };
+  const isPremium = ch.isPremium;
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paperDark,color:s.inkDarkMode,fontFamily:serif}}>
+      <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:6}}>
+        <span onClick={onBack} style={{fontSize:20,cursor:'pointer',padding:'4px 8px',color:'#6B6560'}}>‹</span>
+        <span style={{fontSize:13,fontWeight:600,flex:1,textAlign:'center',fontFamily:sans}}>{book.title}</span>
+        <span style={{width:32}} />
+      </div>
+      <div style={{padding:'8px 20px 20px',flex:1}}>
+        <div style={{fontFamily:mono,fontSize:10,color:'#6B6560',letterSpacing:'0.1em',marginBottom:12}}>第 {ci+1} / {chs.length} 章</div>
+        <h2 style={{fontFamily:serif,fontSize:22,fontWeight:700,margin:'0 0 16px',lineHeight:1.3,color:'#E8E4DF'}}>{ch.title}</h2>
+        {isPremium && (
+          <div style={{background:'rgba(184,69,26,0.15)',border:'0.5px solid rgba(184,69,26,0.4)',borderRadius:6,padding:'14px',marginBottom:16,textAlign:'center'}}>
+            <div style={{fontSize:13,color:'#E8E4DF',marginBottom:6,fontFamily:sans}}>本章为付费章节</div>
+            <div style={{fontSize:11,color:'#A39E99',marginBottom:10,fontFamily:sans}}>解锁需消耗 {book.chapterPrice} 金币</div>
+            <div onClick={onRecharge} style={{background:s.rust,color:'#fff',padding:'8px 16px',borderRadius:4,fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-block',fontFamily:sans}}>立即解锁</div>
+          </div>
+        )}
+        <div style={{fontSize:15,lineHeight:1.85,color:'#D4CFC9',whiteSpace:'pre-wrap',fontFamily:serif}}>{ch.content}</div>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',padding:'12px 20px',borderTop:'0.5px solid rgba(255,255,255,0.08)'}}>
+        <span onClick={goPrev} style={{fontSize:13,color:ci>0?'#D4CFC9':'#6B6560',cursor:ci>0?'pointer':'default',fontFamily:sans}}>‹ 上一章</span>
+        <span onClick={goNext} style={{fontSize:13,color:ci<chs.length-1?'#D4CFC9':'#6B6560',cursor:ci<chs.length-1?'pointer':'default',fontFamily:sans}}>下一章 ›</span>
+      </div>
+    </div>
+  );
+}
+
+function RechargeScreen({ onBack }) {
+  const pkgs = [
+    {coins:100,price:10,badge:''},
+    {coins:500,price:45,badge:'送50'},
+    {coins:1000,price:88,badge:'送150'},
+    {coins:5000,price:388,badge:'送1000'},
+  ];
+  return (
+    <div className="fade-in" style={{minHeight:'100%',display:'flex',flexDirection:'column',background:s.paper}}>
+      <div style={{padding:'12px 16px',display:'flex',alignItems:'center',gap:6,borderBottom:`0.5px solid ${s.rule}`}}>
+        <span onClick={onBack} style={{fontSize:20,cursor:'pointer',padding:'4px 8px',fontFamily:serif,color:s.inkMuted}}>‹</span>
+        <span style={{fontSize:14,fontWeight:600,flex:1,textAlign:'center',fontFamily:sans}}>充值</span>
+        <span style={{width:32}} />
+      </div>
+      <div style={{padding:'20px 20px 12px'}}>
+        <ChapterNum num={6} label="充值" />
+        <h1 className="letterpress" style={{fontFamily:serif,fontSize:22,lineHeight:1.2,margin:'2px 0 4px',fontWeight:700}}>为阅读<br/>充值。</h1>
+        <p style={{fontSize:12,color:s.inkMuted,margin:0,fontFamily:sans}}>当前余额：<strong style={{color:s.rust}}>1,240</strong> 金币</p>
+      </div>
+      <div style={{padding:'0 20px',flex:1}}>
+        {pkgs.map((p,i)=>[
+          <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 14px',border:`0.5px solid ${s.rule}`,borderRadius:6,marginBottom:10,cursor:'pointer'}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:s.ink,fontFamily:sans}}>{p.coins} 金币</div>
+              {p.badge && <span style={{fontSize:10,color:s.rust,background:s.rustLight,padding:'1px 5px',borderRadius:2,marginTop:4,display:'inline-block',fontFamily:mono}}>{p.badge}</span>}
+            </div>
+            <div style={{fontSize:16,fontWeight:600,color:s.rust,fontFamily:sans}}>¥{p.price}</div>
+          </div>
+        ])}
+      </div>
+      <div style={{padding:'16px 20px'}}>
+        <div style={{background:s.ink,color:s.paper,textAlign:'center',padding:'14px',borderRadius:6,fontSize:15,fontWeight:600,cursor:'pointer',fontFamily:sans}}>确认支付</div>
+      </div>
+    </div>
+  );
+}
+
+/* ========== APP ========== */
+function AppPhone() {
+  const [screen, setScreen] = React.useState('home');
+  const [selectedBook, setSelectedBook] = React.useState(null);
+  const [history, setHistory] = React.useState([]);
+
+  const navigate = (to, book) => {
+    setHistory(h => [...h, { screen, book: selectedBook }]);
+    if (book) setSelectedBook(book);
+    setScreen(to);
+  };
+  const goBack = () => {
+    const prev = history[history.length-1];
+    if (prev) { setScreen(prev.screen); setSelectedBook(prev.book); setHistory(h=>h.slice(0,-1)); }
+    else { setScreen('home'); setSelectedBook(null); }
+  };
+  const goTab = tab => { setHistory([]); setSelectedBook(null); setScreen(tab); };
+
+  const renderScreen = () => {
+    switch(screen) {
+      case 'home': return <HomeScreen onBook={b=>navigate('detail',b)} />;
+      case 'store': return <StoreScreen onBook={b=>navigate('detail',b)} />;
+      case 'shelf': return <ShelfScreen onBook={b=>navigate('detail',b)} />;
+      case 'me': return <MeScreen onRecharge={()=>navigate('recharge')} />;
+      case 'detail': return selectedBook ? <BookDetailScreen book={selectedBook} onBack={goBack} onRead={()=>navigate('reader')} /> : null;
+      case 'reader': return selectedBook ? <ReaderScreen book={selectedBook} onBack={goBack} onRecharge={()=>navigate('recharge')} /> : null;
+      case 'recharge': return <RechargeScreen onBack={goBack} />;
+      default: return <HomeScreen onBook={b=>navigate('detail',b)} />;
+    }
+  };
+
+  const showTabBar = ['home','store','shelf','me'].includes(screen);
+
+  return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',minHeight:'100vh',padding:20,background:'#E8E4DF'}}>
+      <div style={ios.wrapper}>
+        <div style={{...ios.screen, width:393, height:852}}>
+          <div style={{...ios.statusBar,color:'#000'}}>
+            <span>9:41</span>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 11.5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/><path d="M3 7.5a7 7 0 0110 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round"/><path d="M1 4.5a11 11 0 0114 0" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7"/></svg>
+              <div style={{width:26,height:12,border:'1.5px solid currentColor',borderRadius:3,padding:1,position:'relative',opacity:0.8}}>
+                <div style={{width:'80%',height:'100%',background:'currentColor',borderRadius:1}} />
+                <div style={{position:'absolute',top:3,right:-3,width:2,height:6,background:'currentColor',borderRadius:'0 1px 1px 0'}} />
+              </div>
+            </div>
+          </div>
+          <div style={ios.island} />
+          <div style={ios.content}>
+            {renderScreen()}
+          </div>
+          {showTabBar && <TabBar active={screen} onChange={goTab} />}
+          <div style={ios.homeBar} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<AppPhone />);
+</script>
+</body>
+</html>

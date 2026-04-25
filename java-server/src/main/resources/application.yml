@@ -1,0 +1,31 @@
+server:
+  port: 3001
+
+spring:
+  application:
+    name: bookstore
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookstore?currentSchema=public
+    username: zoulingxi
+    password:
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    show-sql: false
+
+jwt:
+  secret: fallback-secret
+  expiration: 86400000
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

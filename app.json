@@ -1,0 +1,50 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/store/store",
+    "pages/bookshelf/bookshelf",
+    "pages/profile/profile",
+    "pages/book/detail",
+    "pages/book/read",
+    "pages/recharge/recharge"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "悦读书城",
+    "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "color": "#868e96",
+    "selectedColor": "#339af0",
+    "backgroundColor": "#fff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "images/tab_home.png",
+        "selectedIconPath": "images/tab_home_active.png"
+      },
+      {
+        "pagePath": "pages/store/store",
+        "text": "书城",
+        "iconPath": "images/tab_store.png",
+        "selectedIconPath": "images/tab_store_active.png"
+      },
+      {
+        "pagePath": "pages/bookshelf/bookshelf",
+        "text": "书架",
+        "iconPath": "images/tab_shelf.png",
+        "selectedIconPath": "images/tab_shelf_active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/tab_profile.png",
+        "selectedIconPath": "images/tab_profile_active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json"
+}

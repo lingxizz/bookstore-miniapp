@@ -1,0 +1,1633 @@
+     1|<template>
+     2|  <view class="page" :style="themeStyle">
+     3|    <!-- 顶部工具栏 -->
+     4|    <view class="top-bar" :class="{ show: showUI }" @click.stop>
+     5|      <text class="back" @click.stop="uni.navigateBack()">←</text>
+     6|      <text class="book-title">{{ currentBlockTitle || book.title }}</text>
+     7|      <view class="top-actions">
+     8|        <view class="shelf-btn" @click.stop="toggleShelf">
+     9|          <svg class="shelf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    10|            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+    11|            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+    12|          </svg>
+    13|          <text class="shelf-text">{{ inShelf ? '已加入' : '加入书架' }}</text>
+    14|        </view>
+    15|        <text class="more" @click.stop="showSettings = !showSettings">⋮</text>
+    16|      </view>
+    17|    </view>
+    18|
+    19|    <!-- 连续流阅读内容 -->
+    20|    <scroll-view
+    21|      scroll-y
+    22|      class="reader-content"
+    23|      :class="{ 'has-menu': showUI }"
+    24|      :scroll-top="scrollTop"
+    25|      :scroll-into-view="scrollIntoView"
+    26|      @scroll="onScroll"
+    27|      @scrolltoupper="onScrollToUpper"
+    28|      @scrolltolower="onScrollToLower"
+    29|      upper-threshold="200"
+    30|      lower-threshold="200"
+    31|    >
+    32|      <view class="reader-inner" v-if="blocks.length > 0">
+    33|        <view v-if="isLoadingPrev" class="loading-prev">
+    34|          <view class="loading-spinner"></view>
+    35|          <text class="loading-text">正在加载上一章...</text>
+    36|        </view>
+    37|        <view
+    38|          v-for="block in blocks"
+    39|          :key="block.id"
+    40|          :id="'ch-' + block.id"
+    41|          :data-id="block.id"
+    42|          class="chapter-block"
+    43|          :class="pageAnimClass"
+    44|        >
+    45|          <view v-if="block.locked" class="lock-overlay">
+    46|            <text class="lock-icon">🔒</text>
+    47|            <text class="lock-title">本章已锁定</text>
+    48|            <text class="lock-desc">完成广告观看即可解锁继续阅读</text>
+    49|            <view class="unlock-ad-btn" @click.stop="startAdUnlock(block.id)">
+    50|              <text class="unlock-ad-text">📱 看广告解锁</text>
+    51|            </view>
+    52|            <text class="lock-hint">解锁后可读完整内容</text>
+    53|          </view>
+    54|
+    55|          <template v-else>
+    56|            <view class="chapter-title" :style="{ fontSize: fontSize + 4 + 'rpx' }">
+    57|              {{ block.title }}
+    58|            </view>
+    59|            <view
+    60|              class="chapter-body"
+    61|              :style="{
+    62|                fontSize: fontSize + 'rpx',
+    63|                lineHeight: lineHeight,
+    64|                opacity: contentOpacity,
+    65|                fontFamily: fontFamily === 'serif' ? 'Noto Serif SC, serif' : fontFamily === 'sans' ? 'Noto Sans SC, sans-serif' : fontFamily === 'mono' ? 'monospace' : 'inherit'
+    66|              }"
+    67|            >
+    68|              <text
+    69|                v-for="(p, i) in block.paragraphs"
+    70|                :key="i"
+    71|                class="para"
+    72|                :style="{ marginBottom: paragraphGap + 'rpx' }"
+    73|              >{{ p }}</text>
+    74|            </view>
+    75|            <view class="chapter-end">
+    76|              <text>— 本章完 —</text>
+    77|            </view>
+    78|          </template>
+    79|        </view>
+    80|
+    81|        <!-- 加载更多 -->
+    82|        <view v-if="isLoadingMore" class="loading-more">
+    83|          <text class="loading-text">正在加载下一章...</text>
+    84|        </view>
+    85|
+    86|        <!-- 全书完 -->
+    87|        <view v-if="allLoaded" class="book-end">
+    88|          <text>— 全书完 —</text>
+    89|        </view>
+    90|      </view>
+    91|    </scroll-view>
+    92|
+    93|    <!-- 底部设置面板 -->
+    94|    <view class="bottom-settings" :class="{ show: showSettings && showUI }" @click.stop>
+    95|      <!-- 字号设置 -->
+    96|      <view class="setting-row">
+    97|        <text class="setting-label">字号</text>
+    98|        <view class="setting-control">
+    99|          <text class="font-btn" @click.stop="fontSize = Math.max(24, fontSize - 2)">A-</text>
+   100|          <text class="font-value">{{ Math.round(fontSize / 2) }}</text>
+   101|          <text class="font-btn" @click.stop="fontSize = Math.min(48, fontSize + 2)">A+</text>
+   102|        </view>
+   103|      </view>
+   104|
+   105|      <!-- 行间距 -->
+   106|      <view class="setting-row">
+   107|        <text class="setting-label">行间距</text>
+   108|        <slider
+   109|          class="setting-slider"
+   110|          :value="lineHeight * 10"
+   111|          min="14"
+   112|          max="24"
+   113|          step="1"
+   114|          @change="e => lineHeight = e.detail.value / 10"
+   115|        />
+   116|      </view>
+   117|
+   118|      <!-- 段间距 -->
+   119|      <view class="setting-row">
+   120|        <text class="setting-label">段间距</text>
+   121|        <slider
+   122|          class="setting-slider"
+   123|          :value="paragraphGap"
+   124|          min="0"
+   125|          max="40"
+   126|          step="4"
+   127|          @change="e => paragraphGap = e.detail.value"
+   128|        />
+   129|      </view>
+   130|
+   131|      <!-- 亮度调节 -->
+   132|      <view class="setting-row">
+   133|        <text class="setting-label">亮度 {{ brightness }}%</text>
+   134|        <slider
+   135|          class="setting-slider"
+   136|          :value="brightness"
+   137|          min="30"
+   138|          max="150"
+   139|          step="5"
+   140|          @change="e => brightness = e.detail.value"
+   141|        />
+   142|      </view>
+   143|
+   144|      <!-- 字体选择 -->
+   145|      <view class="setting-row font-row">
+   146|        <text class="setting-label">字体</text>
+   147|        <view class="font-options">
+   148|          <view
+   149|            v-for="f in fontList"
+   150|            :key="f.key"
+   151|            class="font-option"
+   152|            :class="{ active: fontFamily === f.key }"
+   153|            @click.stop="fontFamily = f.key"
+   154|          >
+   155|            <text class="font-label">{{ f.label }}</text>
+   156|          </view>
+   157|        </view>
+   158|      </view>
+   159|
+   160|      <!-- 翻页动画 -->
+   161|      <view class="setting-row page-turn-row">
+   162|        <text class="setting-label">翻页</text>
+   163|        <view class="page-turn-options">
+   164|          <view
+   165|            v-for="p in pageTurnList"
+   166|            :key="p.key"
+   167|            class="page-turn-option"
+   168|            :class="{ active: pageTurn === p.key }"
+   169|            @click.stop="pageTurn = p.key"
+   170|          >
+   171|            <text class="page-turn-label">{{ p.label }}</text>
+   172|          </view>
+   173|        </view>
+   174|      </view>
+   175|
+   176|      <!-- 主题 -->
+   177|      <view class="setting-row theme-row">
+   178|        <text class="setting-label">主题</text>
+   179|        <view class="theme-btns">
+   180|          <view
+   181|            v-for="t in themeList"
+   182|            :key="t.key"
+   183|            class="theme-btn"
+   184|            :class="{ active: theme === t.key }"
+   185|            :style="{ background: t.color }"
+   186|            @click.stop="theme = t.key"
+   187|          >
+   188|            <text class="theme-label" :style="{ color: t.key === 'light' ? '#333' : '#fff' }">{{ t.label }}</text>
+   189|          </view>
+   190|        </view>
+   191|      </view>
+   192|    </view>
+   193|
+   194|    <!-- 底部工具栏 -->
+   195|    <view class="bottom-bar" :class="{ show: showUI }" @click.stop>
+   196|      <view class="progress-section">
+   197|        <slider
+   198|          class="chapter-slider"
+   199|          :value="chapterProgress"
+   200|          min="0"
+   201|          max="100"
+   202|          @change="onProgressChange"
+   203|          block-size="12"
+   204|        />
+   205|        <text class="progress-text">{{ currentChapterIndex + 1 }} / {{ chapters.length }} 章</text>
+   206|      </view>
+   207|      <view class="bottom-actions">
+   208|        <view class="action-btn" @click.stop="prevChapter">
+   209|          <text class="action-icon">‹</text>
+   210|          <text class="action-text">上一章</text>
+   211|        </view>
+   212|        <view class="action-btn" @click.stop="showSettings = !showSettings">
+   213|          <text class="action-icon">Aa</text>
+   214|          <text class="action-text">设置</text>
+   215|        </view>
+   216|        <view class="action-btn" @click.stop="togglePlay">
+   217|          <text class="action-icon">{{ isPlaying ? '⏸' : '▶' }}</text>
+   218|          <text class="action-text">{{ isPlaying ? '暂停' : '听书' }}</text>
+   219|        </view>
+   220|        <view class="action-btn" @click.stop="showCatalog">
+   221|          <text class="action-icon">☰</text>
+   222|          <text class="action-text">目录</text>
+   223|        </view>
+   224|        <view class="action-btn" @click.stop="nextChapter">
+   225|          <text class="action-icon">›</text>
+   226|          <text class="action-text">下一章</text>
+   227|        </view>
+   228|      </view>
+   229|    </view>
+   230|
+   231|    <!-- 广告播放弹窗 -->
+   232|    <view class="ad-modal" v-if="showAdModal" @click="closeAd">
+   233|      <view class="ad-content" @click.stop>
+   234|        <view class="ad-header">
+   235|          <text class="ad-title">广告播放中</text>
+   236|          <text class="ad-close" @click.stop="closeAd">×</text>
+   237|        </view>
+   238|        <view class="ad-body">
+   239|          <text class="ad-brand">🎮 刺激战场 - 全新S36赛季已开启</text>
+   240|          <text class="ad-desc">立即下载，领取限定武器皮肤！全新地图、新模式上线！</text>
+   241|          <view class="ad-progress-bar">
+   242|            <view class="ad-progress-fill" :style="{ width: adProgress + '%' }"></view>
+   243|          </view>
+   244|          <text class="ad-progress-text">{{ adProgress < 100 ? '广告播放中 ' + adProgress + '%' : '广告播放完成，解锁中...' }}</text>
+   245|        </view>
+   246|      </view>
+   247|    </view>
+   248|
+   249|    <!-- 章节快速选择 -->
+   250|    <view class="catalog-modal" v-if="showCatalogPanel" @click="showCatalogPanel = false">
+   251|      <view class="catalog-content" @click.stop>
+   252|        <text class="catalog-title">章节目录</text>
+   253|        <scroll-view scroll-y class="catalog-list">
+   254|          <view
+   255|            v-for="ch in chapters"
+   256|            :key="ch.id"
+   257|            class="catalog-item"
+   258|            :class="{ active: ch.id === chapterId }"
+   259|            @click.stop="selectChapter(ch)"
+   260|          >
+   261|            <text class="catalog-item-title">{{ ch.title }}</text>
+   262|            <text v-if="!ch.isFree" class="catalog-lock">锁</text>
+   263|            <text v-else class="catalog-free">免费</text>
+   264|          </view>
+   265|        </scroll-view>
+   266|      </view>
+   267|    </view>
+   268|  </view>
+   269|</template>
+   270|
+   271|<script setup lang="ts">
+   272|import { ref, computed, onMounted, nextTick, onUnmounted, watch } from 'vue';
+   273|import { onLoad } from '@dcloudio/uni-app';
+   274|import { fetchBook, fetchChapters, fetchChapter, checkShelf, addToShelf, removeFromShelf, markChapterRead, saveProgress, type Book, type Chapter } from '@/api/book';
+   275|import { fetchReaderConfig, saveReaderConfig } from '@/api/user';
+   276|import { adComplete, adUnlock } from '@/api/ad';
+   277|
+   278|type ThemeKey = 'dark' | 'light' | 'sepia' | 'green';
+   279|
+   280|const themeList = [
+   281|  { key: 'dark' as ThemeKey, label: '夜间', color: '#141210' },
+   282|  { key: 'light' as ThemeKey, label: '日间', color: '#F5F5F0' },
+   283|  { key: 'sepia' as ThemeKey, label: '羊皮纸', color: '#F4ECD8' },
+   284|  { key: 'green' as ThemeKey, label: '护眼', color: '#C7EDCC' },
+   285|];
+   286|
+   287|const themeVars: Record<ThemeKey, Record<string, string>> = {
+   288|  dark: {
+   289|    '--page-bg': '#141210',
+   290|    '--text-primary': '#D4CFC9',
+   291|    '--text-title': '#FAF8F5',
+   292|    '--panel-bg': 'rgba(30,28,26,0.95)',
+   293|    '--border-color': '#2a2826',
+   294|    '--accent': '#B8451A',
+   295|    '--text-secondary': '#9B9590',
+   296|    '--text-muted': '#6B6560',
+   297|  },
+   298|  light: {
+   299|    '--page-bg': '#F5F5F0',
+   300|    '--text-primary': '#333333',
+   301|    '--text-title': '#1a1a1a',
+   302|    '--panel-bg': 'rgba(255,255,255,0.95)',
+   303|    '--border-color': '#e0e0d8',
+   304|    '--accent': '#B8451A',
+   305|    '--text-secondary': '#666666',
+   306|    '--text-muted': '#999999',
+   307|  },
+   308|  sepia: {
+   309|    '--page-bg': '#F4ECD8',
+   310|    '--text-primary': '#5B4B3A',
+   311|    '--text-title': '#3D2B1F',
+   312|    '--panel-bg': 'rgba(244,236,216,0.95)',
+   313|    '--border-color': '#D9CBA0',
+   314|    '--accent': '#8B6914',
+   315|    '--text-secondary': '#7A6B5A',
+   316|    '--text-muted': '#A09080',
+   317|  },
+   318|  green: {
+   319|    '--page-bg': '#C7EDCC',
+   320|    '--text-primary': '#2F4F2F',
+   321|    '--text-title': '#1A3A1A',
+   322|    '--panel-bg': 'rgba(199,237,204,0.95)',
+   323|    '--border-color': '#A8D8B0',
+   324|    '--accent': '#2E8B57',
+   325|    '--text-secondary': '#4A7A4A',
+   326|    '--text-muted': '#6A9A6A',
+   327|  },
+   328|};
+   329|
+   330|const book = ref<Partial<Book>>({});
+   331|const chapters = ref<Chapter[]>([]);
+   332|const chapterId = ref(1);
+   333|const fontSize = ref(32);
+   334|const theme = ref<ThemeKey>('dark');
+   335|const lineHeight = ref(1.8);
+   336|const paragraphGap = ref(24);
+   337|const brightness = ref(100);
+   338|const fontFamily = ref('system');
+   339|const pageTurn = ref('slide');
+   340|
+   341|const fontList = [
+   342|  { key: 'system', label: '系统默认' },
+   343|  { key: 'serif', label: '思源宋体' },
+   344|  { key: 'sans', label: '思源黑体' },
+   345|  { key: 'mono', label: '等宽字体' },
+   346|];
+   347|
+   348|const pageTurnList = [
+   349|  { key: 'slide', label: '滑动' },
+   350|  { key: 'cover', label: '覆盖' },
+   351|  { key: 'sim', label: '仿真' },
+   352|  { key: 'none', label: '无' },
+   353|];
+   354|
+   355|const themeStyle = computed(() => ({
+   356|  ...themeVars[theme.value],
+   357|  ...(brightness.value !== 100 ? { filter: `brightness(${brightness.value}%)` } : {}),
+   358|}));
+   359|
+   360|const showUI = ref(false);
+   361|const showSettings = ref(false);
+   362|const showCatalogPanel = ref(false);
+   363|const showAdModal = ref(false);
+   364|const adProgress = ref(0);
+   365|const adUnlocking = ref(false);
+   366|const isLoading = ref(false);
+   367|const contentOpacity = ref(1);
+   368|const scrollTop = ref(0);
+   369|const pageAnimClass = ref('');
+   370|
+   371|/* ========== 连续流阅读核心状态 ========== */
+   372|interface ChapterBlock {
+   373|  id: number;
+   374|  title: string;
+   375|  content: string;
+   376|  locked: boolean;
+   377|  paragraphs: string[];
+   378|}
+   379|
+   380|const blocks = ref<ChapterBlock[]>([]);
+   381|const currentVisibleChapterId = ref(1);
+   382|const isLoadingMore = ref(false);
+   383|const isLoadingPrev = ref(false);
+   384|const scrollIntoView = ref('');
+   385|const inShelf = ref(false);
+   386|const isPlaying = ref(false);
+   387|const readChapterIds = ref<Set<number>>(new Set());
+   388|let progressTimer: any = null;
+   389|let configSaveTimer: any = null;
+   390|const allLoaded = ref(false);
+   391|const pendingUnlockChapterId = ref<number | null>(null);
+   392|let adTimer: any = null;
+   393|const preloadCache = ref<Map<number, any>>(new Map());
+   394|let isRestoringScroll = false;
+   395|
+   396|/* ========== 计算属性 ========== */
+   397|const currentBlockTitle = computed(() => {
+   398|  const block = blocks.value.find(b => b.id === currentVisibleChapterId.value);
+   399|  return block?.title || '';
+   400|});
+   401|
+   402|const currentChapterIndex = computed(() =>
+   403|  chapters.value.findIndex(c => c.id === currentVisibleChapterId.value)
+   404|);
+   405|
+   406|const chapterProgress = computed(() => {
+   407|  if (chapters.value.length === 0) return 0;
+   408|  return Math.round(((currentChapterIndex.value + 1) / chapters.value.length) * 100);
+   409|});
+   410|
+   411|/* ========== 生命周期 ========== */
+   412|onLoad(async (opts: any) => {
+   413|  const bid = parseInt(opts?.bookId || '1');
+   414|  const cid = parseInt(opts?.chapterId || '1');
+   415|  chapterId.value = cid;
+   416|  currentVisibleChapterId.value = cid;
+   417|
+   418|  try {
+   419|    const [b, chs, shelfRes, config] = await Promise.all([
+   420|      fetchBook(bid),
+   421|      fetchChapters(bid),
+   422|      checkShelf(bid).catch(() => ({ inShelf: false })),
+   423|      fetchReaderConfig().catch(() => null),
+   424|    ]);
+   425|    if (b) book.value = b;
+   426|    if (chs) chapters.value = chs;
+   427|    inShelf.value = shelfRes.inShelf;
+   428|
+   429|    // 加载用户配置
+   430|    if (config) {
+   431|      if (config.fontSize) fontSize.value = config.fontSize;
+   432|      if (config.lineHeight) lineHeight.value = config.lineHeight / 100;
+   433|      if (config.theme) theme.value = config.theme as ThemeKey;
+   434|      if (config.brightness) brightness.value = config.brightness;
+   435|    }
+   436|
+   437|    // 如果 URL 明确指定了 chapterId（从目录/详情页主动跳转），优先使用它，不恢复进度
+   438|    let targetId = cid;
+   439|    if (!opts?.chapterId) {
+   440|      const restoredId = await restoreProgress(bid);
+   441|      if (restoredId) targetId = restoredId;
+   442|    }
+   443|
+   444|    chapterId.value = targetId;
+   445|    currentVisibleChapterId.value = targetId;
+   446|    await loadChapter(targetId);
+   447|
+   448|    // 启动进度上报定时器
+   449|    progressTimer = setInterval(() => {
+   450|      if (book.value.id && currentVisibleChapterId.value) {
+   451|        const container = getScrollContainer();
+   452|        const progress = container
+   453|          ? Math.min(1, Math.max(0, container.scrollTop / (container.scrollHeight - container.clientHeight)))
+   454|          : 0;
+   455|        saveProgress(book.value.id, currentVisibleChapterId.value, progress).catch(() => {});
+   456|      }
+   457|    }, 30000); // 30s 上报一次
+   458|  } catch (e) {
+   459|    console.error('fetch reader failed', e);
+   460|  }
+   461|});
+   462|
+   463|onUnmounted(() => {
+   464|  if (progressTimer) clearInterval(progressTimer);
+   465|  if (configSaveTimer) clearTimeout(configSaveTimer);
+   466|});
+   467|
+   468|// 监听配置变化，自动保存
+   469|watch([fontSize, lineHeight, theme, brightness], () => {
+   470|  debounceSaveConfig();
+   471|}, { deep: true });
+   472|
+   473|// H5 下 scroll-view 内部 Vue @click 不生效，用原生监听器补充
+   474|// 注意：监听器绑定在 .reader-content 而非 .reader-inner，避免 contentKey 变化导致 inner 重建后事件丢失
+   475|onMounted(() => {
+   476|  // #ifdef H5
+   477|  setTimeout(() => {
+   478|    const content = document.querySelector('.reader-content');
+   479|    if (content) {
+   480|      content.addEventListener('click', (e) => {
+   481|        const target = e.target as HTMLElement;
+   482|        // 只处理点击在 reader-inner 内部的事件，且排除交互元素
+   483|        if (target.closest('.reader-inner') && !target.closest('.unlock-ad-btn')) {
+   484|          onPageClick(e as any);
+   485|        }
+   486|      });
+   487|    }
+   488|  }, 500);
+   489|  // #endif
+   490|});
+   491|
+   492|/* ========== 章节加载 ========== */
+   493|function makeBlock(data: any): ChapterBlock {
+   494|  return {
+   495|    id: data.id,
+   496|    title: data.title || '加载中...',
+   497|    content: data.content || '',
+   498|    locked: data.locked,
+   499|    paragraphs: data.content ? data.content.split('\n\n') : [],
+   500|  };
+   501|}
+   502|
+   503|async function loadChapter(id: number, direction: 'prev' | 'next' | 'init' = 'init') {
+   504|  isLoading.value = true;
+   505|  allLoaded.value = true; // 先阻止触底加载，避免空内容触发底部事件
+   506|  blocks.value = [];      // 清空内容，v-if 会链式销毁 reader-inner，彻底清除 scroll 状态
+   507|  contentOpacity.value = 0;
+   508|
+   509|  try {
+   510|    // 等待 reader-inner 销毁，scroll-view 内部滚动状态彻底清除
+   511|    await nextTick();
+   512|
+   513|    // 确保滚动归零
+   514|    scrollTop.value = 0;
+   515|    // #ifdef H5
+   516|    const container = getScrollContainer();
+   517|    if (container) container.scrollTop = 0;
+   518|    // #endif
+   519|
+   520|    const data = await fetchChapter(id);
+   521|    blocks.value = [makeBlock(data)];
+   522|    chapterId.value = id;
+   523|    currentVisibleChapterId.value = id;
+   524|
+   525|    // 等待新的 reader-inner 创建渲染
+   526|    await nextTick();
+   527|
+   528|    // 再次确保滚动归零（新内容渲染后 scroll-view 可能自动滚动）
+   529|    scrollTop.value = 0;
+   530|    // #ifdef H5
+   531|    if (container) container.scrollTop = 0;
+   532|    // #endif
+   533|
+   534|    allLoaded.value = false; // 恢复触底加载
+   535|    contentOpacity.value = 1;
+   536|    applyPageAnim(direction);
+   537|    saveReadingProgress();
+   538|    markCurrentChapterRead();
+   539|
+   540|    // 初始化时加载下一章到连续流（仅限免费章节），让用户一进来就能连续滚动
+   541|    const idx = chapters.value.findIndex(c => c.id === id);
+   542|    if (idx >= 0 && idx < chapters.value.length - 1) {
+   543|      const nextCh = chapters.value[idx + 1];
+   544|      if (nextCh.isFree) {
+   545|        try {
+   546|          const nextData = await fetchChapter(nextCh.id);
+   547|          blocks.value.push(makeBlock(nextData));
+   548|        } catch (e) { /* ignore */ }
+   549|      } else {
+   550|        preloadChapter(nextCh.id);
+   551|      }
+   552|    }
+   553|  } catch (e) {
+   554|    console.error('load chapter failed', e);
+   555|  } finally {
+   556|    isLoading.value = false;
+   557|  }
+   558|}
+   559|
+   560|async function preloadChapter(id: number) {
+   561|  if (preloadCache.value.has(id)) return;
+   562|  try {
+   563|    const data = await fetchChapter(id);
+   564|    preloadCache.value.set(id, data);
+   565|  } catch (e) { /* ignore */ }
+   566|}
+   567|
+   568|function getCachedChapter(id: number) {
+   569|  return preloadCache.value.get(id);
+   570|}
+   571|
+   572|async function jumpToChapter(id: number, direction: 'prev' | 'next' | 'init' = 'init') {
+   573|  // 如果目标章节已在连续流中，直接滚动过去
+   574|  const existingIdx = blocks.value.findIndex(b => b.id === id);
+   575|  if (existingIdx >= 0) {
+   576|    scrollIntoView.value = '';
+   577|    await nextTick();
+   578|    scrollIntoView.value = 'ch-' + id;
+   579|    currentVisibleChapterId.value = id;
+   580|    chapterId.value = id;
+   581|    saveReadingProgress();
+   582|    markCurrentChapterRead();
+   583|    return;
+   584|  }
+   585|  // 不在当前窗口（跳得太远），回退到清空重载
+   586|  await loadChapter(id, direction);
+   587|}
+   588|
+   589|function applyPageAnim(direction: 'prev' | 'next' | 'init') {
+   590|  if (pageTurn.value === 'none' || direction === 'init') {
+   591|    pageAnimClass.value = '';
+   592|    return;
+   593|  }
+   594|  const animMap: Record<string, Record<string, string>> = {
+   595|    slide: { next: 'anim-slide-left', prev: 'anim-slide-right' },
+   596|    cover: { next: 'anim-cover-in', prev: 'anim-cover-out' },
+   597|    sim: { next: 'anim-sim-right', prev: 'anim-sim-left' },
+   598|  };
+   599|  const targetClass = animMap[pageTurn.value]?.[direction] || '';
+   600|  // 先清空再赋值，确保 Vue 检测到变化从而触发 CSS 动画
+   601|  pageAnimClass.value = '';
+   602|  requestAnimationFrame(() => {
+   603|    pageAnimClass.value = targetClass;
+   604|  });
+   605|  // 800ms 后清除动画类，避免后续滚动触发重复动画
+   606|  setTimeout(() => { pageAnimClass.value = ''; }, 800);
+   607|}
+   608|
+   609|/* ========== 连续流：触顶追加上一章 ========== */
+   610|async function onScrollToUpper() {
+   611|  if (isLoadingPrev.value || isLoadingMore.value) return;
+   612|
+   613|  const firstBlock = blocks.value[0];
+   614|  if (!firstBlock) return;
+   615|
+   616|  const idx = chapters.value.findIndex(c => c.id === firstBlock.id);
+   617|  if (idx <= 0) return; // 已经是第一章
+   618|
+   619|  isLoadingPrev.value = true;
+   620|  isRestoringScroll = true;
+   621|  const prevCh = chapters.value[idx - 1];
+   622|
+   623|  try {
+   624|    const cached = getCachedChapter(prevCh.id);
+   625|    const data = cached || await fetchChapter(prevCh.id);
+   626|
+   627|    // 记录旧第一个 block 的 id，以便插入后定位
+   628|    const oldFirstId = firstBlock.id;
+   629|
+   630|    blocks.value.unshift(makeBlock(data));
+   631|
+   632|    // 等待 DOM 更新后，直接通过原生 scrollTo 恢复位置（绕过 scroll-view 组件内部覆盖逻辑）
+   633|    await nextTick();
+   634|    // #ifdef H5
+   635|    const container = getScrollContainer();
+   636|    if (container) {
+   637|      const oldEl = container.querySelector('.chapter-block[data-id="' + oldFirstId + '"]') as HTMLElement;
+   638|      if (oldEl) {
+   639|        const start = performance.now();
+   640|        const forceLoop = () => {
+   641|          const elRect = oldEl.getBoundingClientRect();
+   642|          const containerRect = container.getBoundingClientRect();
+   643|          const target = container.scrollTop + elRect.top - containerRect.top;
+   644|          if ('scrollTo' in container) {
+   645|            container.scrollTo({ top: target, behavior: 'instant' });
+   646|          } else {
+   647|            container.scrollTop = target;
+   648|          }
+   649|          scrollTop.value = target;
+   650|          if (performance.now() - start < 800) {
+   651|            requestAnimationFrame(forceLoop);
+   652|          } else {
+   653|            isRestoringScroll = false;
+   654|          }
+   655|        };
+   656|        forceLoop();
+   657|      } else {
+   658|        isRestoringScroll = false;
+   659|      }
+   660|    } else {
+   661|      isRestoringScroll = false;
+   662|    }
+   663|    // #endif
+   664|    // #ifndef H5
+   665|    isRestoringScroll = false;
+   666|    // #endif
+   667|
+   668|    // 预加载上上一章
+   669|    if (idx - 2 >= 0) {
+   670|      preloadChapter(chapters.value[idx - 2].id);
+   671|    }
+   672|  } catch (e) {
+   673|    console.error('prepend chapter failed', e);
+   674|    isRestoringScroll = false;
+   675|  } finally {
+   676|    isLoadingPrev.value = false;
+   677|    trimBlocks();
+   678|  }
+   679|}
+   680|
+   681|/* ========== 连续流：触底追加下一章 ========== */
+   682|async function onScrollToLower() {
+   683|  if (isLoadingMore.value || isLoadingPrev.value || allLoaded.value) return;
+   684|
+   685|  const lastBlock = blocks.value[blocks.value.length - 1];
+   686|  if (!lastBlock || lastBlock.locked) return;
+   687|
+   688|  const idx = chapters.value.findIndex(c => c.id === lastBlock.id);
+   689|  if (idx < 0 || idx >= chapters.value.length - 1) {
+   690|    allLoaded.value = true;
+   691|    return;
+   692|  }
+   693|
+   694|  isLoadingMore.value = true;
+   695|  const nextCh = chapters.value[idx + 1];
+   696|
+   697|  try {
+   698|    const cached = getCachedChapter(nextCh.id);
+   699|    const data = cached || await fetchChapter(nextCh.id);
+   700|    blocks.value.push(makeBlock(data));
+   701|
+   702|    // 预加载下下一章
+   703|    if (idx + 2 < chapters.value.length) {
+   704|      preloadChapter(chapters.value[idx + 2].id);
+   705|    }
+   706|  } catch (e) {
+   707|    console.error('append chapter failed', e);
+   708|  } finally {
+   709|    isLoadingMore.value = false;
+   710|    trimBlocks();
+   711|  }
+   712|}
+   713|
+   714|/* ========== 滚动追踪当前章节 ========== */
+   715|let scrollTimer: any = null;
+   716|
+   717|function onScroll(e: any) {
+   718|  if (isSmoothScrolling || isRestoringScroll) return; // 平滑滚动/位置恢复期间屏蔽，避免与 :scroll-top 绑定冲突
+   719|  scrollTop.value = e.detail.scrollTop;
+   720|  if (scrollTimer) clearTimeout(scrollTimer);
+   721|  scrollTimer = setTimeout(() => {
+   722|    updateVisibleChapter();
+   723|  }, 150);
+   724|}
+   725|
+   726|function updateVisibleChapter() {
+   727|  if (blocks.value.length === 0) return;
+   728|
+   729|  // #ifdef H5
+   730|  try {
+   731|    const container = getScrollContainer();
+   732|    if (!container) return;
+   733|    const st = container.scrollTop;
+   734|    const blockEls = document.querySelectorAll('.chapter-block');
+   735|
+   736|    for (let i = blockEls.length - 1; i >= 0; i--) {
+   737|      const el = blockEls[i] as HTMLElement;
+   738|      if (el.offsetTop <= st + 200) {
+   739|        const id = parseInt(el.getAttribute('data-id') || '1');
+   740|        if (currentVisibleChapterId.value !== id) {
+   741|          currentVisibleChapterId.value = id;
+   742|          chapterId.value = id;
+   743|          saveReadingProgress();
+   744|        }
+   745|        break;
+   746|      }
+   747|    }
+   748|  } catch (e) {}
+   749|  // #endif
+   750|}
+   751|
+   752|/* ========== 广告解锁 ========== */
+   753|async function startAdUnlock(blockChapterId?: number) {
+   754|  pendingUnlockChapterId.value = blockChapterId || chapterId.value;
+   755|  showAdModal.value = true;
+   756|  adProgress.value = 0;
+   757|  const total = 3000;
+   758|  const step = 100;
+   759|  let elapsed = 0;
+   760|  if (adTimer) clearInterval(adTimer);
+   761|  adTimer = setInterval(() => {
+   762|    elapsed += step;
+   763|    adProgress.value = Math.min(100, Math.floor((elapsed / total) * 100));
+   764|    if (elapsed >= total) {
+   765|      clearInterval(adTimer);
+   766|      adTimer = null;
+   767|      finishAd();
+   768|    }
+   769|  }, step);
+   770|}
+   771|
+   772|async function finishAd() {
+   773|  adUnlocking.value = true;
+   774|  if (adTimer) { clearInterval(adTimer); adTimer = null; }
+   775|  try {
+   776|    const tokenRes = await adComplete();
+   777|    console.log('[finishAd] adComplete result:', JSON.stringify(tokenRes));
+   778|    if (!tokenRes.token) throw new Error('no token');
+   779|    const targetId = pendingUnlockChapterId.value || chapterId.value;
+   780|    const res = await adUnlock(targetId, tokenRes.token);
+   781|    console.log('[finishAd] adUnlock result:', JSON.stringify(res));
+   782|    if (res.success) {
+   783|      showAdModal.value = false;
+   784|      uni.showToast({ title: '解锁成功', icon: 'success' });
+   785|
+   786|      // 同步更新 chapters 数组锁定状态（用 splice 确保响应式）
+   787|      const chIdx = chapters.value.findIndex(c => c.id === targetId);
+   788|      if (chIdx >= 0) {
+   789|        chapters.value.splice(chIdx, 1, { ...chapters.value[chIdx], isFree: true });
+   790|      }
+   791|
+   792|      const idx = blocks.value.findIndex(b => b.id === targetId);
+   793|      console.log('[finishAd] targetId:', targetId, 'block idx:', idx);
+   794|      if (idx >= 0) {
+   795|        const data = await fetchChapter(targetId);
+   796|        console.log('[finishAd] fetchChapter result:', {id: data.id, locked: data.locked, hasContent: !!data.content});
+   797|        blocks.value.splice(idx, 1, makeBlock(data));
+   798|      } else {
+   799|        await loadChapter(targetId);
+   800|      }
+   801|    } else {
+   802|      uni.showToast({ title: res.error || '解锁失败', icon: 'none' });
+   803|    }
+   804|  } catch (e: any) {
+   805|    console.error('[finishAd] error:', e);
+   806|    uni.showToast({ title: e.message || '解锁失败', icon: 'none' });
+   807|  } finally {
+   808|    adUnlocking.value = false;
+   809|    pendingUnlockChapterId.value = null;
+   810|  }
+   811|}
+   812|
+   813|function closeAd() {
+   814|  showAdModal.value = false;
+   815|  adProgress.value = 0;
+   816|  if (adTimer) { clearInterval(adTimer); adTimer = null; }
+   817|}
+   818|
+   819|/* ========== UI 交互 ========== */
+   820|const toggleUI = () => {
+   821|  if (showSettings.value) {
+   822|    showSettings.value = false;
+   823|    return;
+   824|  }
+   825|  showUI.value = !showUI.value;
+   826|};
+   827|
+   828|/* 左右点击翻页 */
+   829|function onPageClick(e: any) {
+   830|  // 如果弹窗或目录打开，不处理
+   831|  if (showAdModal.value || showCatalogPanel.value) return;
+   832|
+   833|  // uni-app H5 点击事件可能有多种形式
+   834|  const x = e.detail?.x ?? e.clientX ?? e.pageX ?? 0;
+   835|  const { windowWidth } = uni.getSystemInfoSync();
+   836|
+   837|  if (x < windowWidth * 0.3) {
+   838|    // 左侧 30% → 上一屏
+   839|    scrollByPage(-1);
+   840|  } else if (x > windowWidth * 0.7) {
+   841|    // 右侧 30% → 下一屏
+   842|    scrollByPage(1);
+   843|  } else {
+   844|    // 中间 40% → 切换菜单
+   845|    toggleUI();
+   846|  }
+   847|}
+   848|
+   849|function getScrollContainer(): HTMLElement | null {
+   850|  // #ifdef H5
+   851|  const reader = document.querySelector('.reader-content');
+   852|  if (!reader) return null;
+   853|  return reader.querySelector('div[style*="overflow: hidden auto"]') as HTMLElement || null;
+   854|  // #endif
+   855|  // #ifndef H5
+   856|  return null;
+   857|  // #endif
+   858|}
+   859|
+   860|let isSmoothScrolling = false;
+   861|
+   862|function smoothScrollTo(container: HTMLElement, target: number, duration = 280) {
+   863|  if (isSmoothScrolling) return;
+   864|  isSmoothScrolling = true;
+   865|  const start = container.scrollTop;
+   866|  const distance = target - start;
+   867|  const startTime = performance.now();
+   868|
+   869|  function step(currentTime: number) {
+   870|    const elapsed = currentTime - startTime;
+   871|    const progress = Math.min(elapsed / duration, 1);
+   872|    // ease-out cubic
+   873|    const ease = 1 - Math.pow(1 - progress, 3);
+   874|    container.scrollTop = start + distance * ease;
+   875|    if (progress < 1) {
+   876|      requestAnimationFrame(step);
+   877|    } else {
+   878|      isSmoothScrolling = false;
+   879|      scrollTop.value = container.scrollTop;
+   880|    }
+   881|  }
+   882|  requestAnimationFrame(step);
+   883|}
+   884|
+   885|function scrollByPage(direction: number) {
+   886|  // #ifdef H5
+   887|  try {
+   888|    const container = getScrollContainer();
+   889|    if (!container) return;
+   890|
+   891|    if (direction > 0) {
+   892|      // 向下翻页
+   893|      const maxScroll = container.scrollHeight - container.clientHeight;
+   894|      if (container.scrollTop >= maxScroll - 20) {
+   895|        // 已经在底部，切换下一章（带动画）
+   896|        nextChapter();
+   897|      } else {
+   898|        smoothScrollTo(
+   899|          container,
+   900|          container.scrollTop + container.clientHeight * 0.98
+   901|        );
+   902|      }
+   903|    } else {
+   904|      // 向上翻页
+   905|      if (container.scrollTop <= 20) {
+   906|        // 已经在顶部，切换上一章（带动画）
+   907|        prevChapter();
+   908|      } else {
+   909|        smoothScrollTo(
+   910|          container,
+   911|          Math.max(0, container.scrollTop - container.clientHeight * 0.98)
+   912|        );
+   913|      }
+   914|    }
+   915|  } catch (e) {}
+   916|  // #endif
+   917|}
+   918|
+   919|const prevChapter = () => {
+   920|  const idx = chapters.value.findIndex(c => c.id === currentVisibleChapterId.value);
+   921|  if (idx > 0) {
+   922|    const prev = chapters.value[idx - 1];
+   923|    jumpToChapter(prev.id, 'prev');
+   924|    if (idx - 2 >= 0) preloadChapter(chapters.value[idx - 2].id);
+   925|  }
+   926|};
+   927|
+   928|const nextChapter = () => {
+   929|  const idx = chapters.value.findIndex(c => c.id === currentVisibleChapterId.value);
+   930|  if (idx >= 0 && idx < chapters.value.length - 1) {
+   931|    const next = chapters.value[idx + 1];
+   932|    jumpToChapter(next.id, 'next');
+   933|    if (idx + 2 < chapters.value.length) preloadChapter(chapters.value[idx + 2].id);
+   934|  }
+   935|};
+   936|
+   937|const showCatalog = () => {
+   938|  showCatalogPanel.value = true;
+   939|};
+   940|
+   941|const selectChapter = (ch: Chapter) => {
+   942|  showCatalogPanel.value = false;
+   943|  showUI.value = false;
+   944|  showSettings.value = false;
+   945|  const currentIdx = chapters.value.findIndex(c => c.id === currentVisibleChapterId.value);
+   946|  const targetIdx = chapters.value.findIndex(c => c.id === ch.id);
+   947|  const dir = targetIdx > currentIdx ? 'next' : targetIdx < currentIdx ? 'prev' : 'init';
+   948|  jumpToChapter(ch.id, dir);
+   949|};
+   950|
+   951|const onProgressChange = (e: any) => {
+   952|  const pct = e.detail.value / 100;
+   953|  const idx = Math.round(pct * (chapters.value.length - 1));
+   954|  const ch = chapters.value[idx];
+   955|  if (ch) {
+   956|    jumpToChapter(ch.id);
+   957|  }
+   958|};
+   959|
+   960|/* ========== 进度保存/恢复 ========== */
+   961|async function restoreProgress(bookId: number) {
+   962|  const token = uni.getStorageSync('token');
+   963|  if (!token) return null;
+   964|  try {
+   965|    const res: any = await uni.request({
+   966|      url: '/api/books/' + bookId + '/progress',
+   967|      header: { Authorization: 'Bearer ' + token },
+   968|    });
+   969|    const data = res.data;
+   970|    if (data && data.chapterId) {
+   971|      return data.chapterId;
+   972|    }
+   973|  } catch (e) {}
+   974|  return null;
+   975|}
+   976|
+   977|async function saveReadingProgress() {
+   978|  const token = uni.getStorageSync('token');
+   979|  if (!token || !book.value.id) return;
+   980|  const bodyData = { chapterId: chapterId.value || 1, progress: (chapterProgress.value || 0) / 100 };
+   981|  try {
+   982|    await uni.request({
+   983|      url: '/api/books/' + book.value.id + '/progress',
+   984|      method: 'POST',
+   985|      header: {
+   986|        'Authorization': 'Bearer ' + token,
+   987|        'Content-Type': 'application/json'
+   988|      },
+   989|      data: bodyData,
+   990|    });
+   991|  } catch (e) {}
+   992|}
+   993|
+   994|/* ========== 书架 ========== */
+   995|async function toggleShelf() {
+   996|  if (!book.value.id) return;
+   997|  if (inShelf.value) {
+   998|    await removeFromShelf(book.value.id);
+   999|    inShelf.value = false;
+  1000|    uni.showToast({ title: '已移除书架', icon: 'none' });
+  1001|  } else {
+  1002|    await addToShelf(book.value.id);
+  1003|    inShelf.value = true;
+  1004|    uni.showToast({ title: '已加入书架', icon: 'none' });
+  1005|  }
+  1006|}
+  1007|
+  1008|/* ========== 配置自动保存 ========== */
+  1009|function debounceSaveConfig() {
+  1010|  if (configSaveTimer) clearTimeout(configSaveTimer);
+  1011|  configSaveTimer = setTimeout(() => {
+  1012|    saveReaderConfig({
+  1013|      fontSize: fontSize.value,
+  1014|      lineHeight: Math.round(lineHeight.value * 100),
+  1015|      theme: theme.value,
+  1016|      brightness: brightness.value,
+  1017|    }).catch(() => {});
+  1018|  }, 1000);
+  1019|}
+  1020|
+  1021|/* ========== 听书 ========== */
+  1022|function togglePlay() {
+  1023|  isPlaying.value = !isPlaying.value;
+  1024|  if (isPlaying.value) {
+  1025|    // 开始播放当前章节内容
+  1026|    const currentBlock = blocks.value.find(b => b.id === currentVisibleChapterId.value);
+  1027|    if (currentBlock) {
+  1028|      startTTS(currentBlock.content);
+  1029|    }
+  1030|  } else {
+  1031|    stopTTS();
+  1032|  }
+  1033|}
+  1034|
+  1035|let ttsUtterance: SpeechSynthesisUtterance | null = null;
+  1036|function startTTS(text: string) {
+  1037|  // #ifdef H5
+  1038|  if ('speechSynthesis' in window) {
+  1039|    stopTTS();
+  1040|    ttsUtterance = new SpeechSynthesisUtterance(text);
+  1041|    ttsUtterance.lang = 'zh-CN';
+  1042|    ttsUtterance.onend = () => { isPlaying.value = false; };
+  1043|    window.speechSynthesis.speak(ttsUtterance);
+  1044|  }
+  1045|  // #endif
+  1046|}
+  1047|function stopTTS() {
+  1048|  // #ifdef H5
+  1049|  if ('speechSynthesis' in window) {
+  1050|    window.speechSynthesis.cancel();
+  1051|  }
+  1052|  // #endif
+  1053|}
+  1054|
+  1055|/* ========== 章节已读 ========== */
+  1056|function markCurrentChapterRead() {
+  1057|  const cid = currentVisibleChapterId.value;
+  1058|  if (cid && !readChapterIds.value.has(cid)) {
+  1059|    readChapterIds.value.add(cid);
+  1060|    markChapterRead(cid).catch(() => {});
+  1061|  }
+  1062|}
+  1063|</script>
+  1064|
+  1065|<style scoped>
+  1066|.page {
+  1067|  min-height: 100vh;
+  1068|  background: var(--page-bg);
+  1069|  color: var(--text-primary);
+  1070|  transition: background 0.3s ease, color 0.3s ease;
+  1071|}
+  1072|
+  1073|/* 顶部工具栏 */
+  1074|.top-bar {
+  1075|  position: fixed;
+  1076|  top: -120rpx;
+  1077|  left: 0;
+  1078|  right: 0;
+  1079|  display: flex;
+  1080|  align-items: center;
+  1081|  justify-content: space-between;
+  1082|  padding: 48rpx 32rpx 16rpx;
+  1083|  padding-top: calc(48rpx + env(safe-area-inset-top));
+  1084|  background: var(--panel-bg);
+  1085|  backdrop-filter: blur(10rpx);
+  1086|  opacity: 0;
+  1087|  visibility: hidden;
+  1088|  pointer-events: none;
+  1089|  transition: top 0.3s ease, opacity 0.3s ease, background 0.3s ease, visibility 0.3s ease;
+  1090|  z-index: 100;
+  1091|}
+  1092|.top-bar.show {
+  1093|  top: 0;
+  1094|  opacity: 1;
+  1095|  visibility: visible;
+  1096|  pointer-events: auto;
+  1097|}
+  1098|.back {
+  1099|  font-size: 36rpx;
+  1100|  color: var(--text-primary);
+  1101|  min-width: 60rpx;
+  1102|}
+  1103|.book-title {
+  1104|  font-size: 28rpx;
+  1105|  color: var(--text-primary);
+  1106|  text-align: center;
+  1107|  flex: 1;
+  1108|  overflow: hidden;
+  1109|  text-overflow: ellipsis;
+  1110|  white-space: nowrap;
+  1111|  padding: 0 16rpx;
+  1112|}
+  1113|.more {
+  1114|  font-size: 36rpx;
+  1115|  color: var(--text-primary);
+  1116|  min-width: 60rpx;
+  1117|  text-align: right;
+  1118|}
+  1119|.top-actions {
+  1120|  display: flex;
+  1121|  align-items: center;
+  1122|  gap: 24rpx;
+  1123|}
+  1124|.shelf-btn {
+  1125|  display: flex;
+  1126|  flex-direction: column;
+  1127|  align-items: center;
+  1128|  gap: 4rpx;
+  1129|  color: var(--accent);
+  1130|}
+  1131|.shelf-icon {
+  1132|  width: 32rpx;
+  1133|  height: 32rpx;
+  1134|}
+  1135|.shelf-text {
+  1136|  font-size: 20rpx;
+  1137|  color: var(--accent);
+  1138|  white-space: nowrap;
+  1139|}
+  1140|
+  1141|/* 阅读内容区 */
+  1142|.reader-content {
+  1143|  height: 100vh;
+  1144|  padding: 32rpx;
+  1145|  padding-top: calc(32rpx + env(safe-area-inset-top));
+  1146|  padding-bottom: 40rpx;
+  1147|  box-sizing: border-box;
+  1148|  transition: padding-bottom 0.3s ease;
+  1149|}
+  1150|.reader-content.has-menu {
+  1151|  padding-bottom: 320rpx;
+  1152|}
+  1153|.reader-inner {
+  1154|  min-height: calc(100vh + 2px);
+  1155|}
+  1156|.chapter-block {
+  1157|  /* 连续流章节块 */
+  1158|}
+  1159|.chapter-title {
+  1160|  font-family: 'Newsreader', Georgia, 'Noto Serif SC', serif;
+  1161|  font-weight: 700;
+  1162|  color: var(--text-title);
+  1163|  margin-bottom: 32rpx;
+  1164|  margin-top: 16rpx;
+  1165|  text-align: center;
+  1166|}
+  1167|.chapter-body {
+  1168|  color: var(--text-primary);
+  1169|  transition: opacity 0.2s ease;
+  1170|  word-break: break-word;
+  1171|  overflow-wrap: break-word;
+  1172|}
+  1173|.para {
+  1174|  display: block;
+  1175|  text-indent: 2em;
+  1176|  word-break: break-word;
+  1177|  overflow-wrap: break-word;
+  1178|}
+  1179|.chapter-end {
+  1180|  text-align: center;
+  1181|  padding: 48rpx 0 32rpx;
+  1182|  color: var(--text-muted);
+  1183|  font-size: 24rpx;
+  1184|  margin-bottom: 48rpx;
+  1185|  border-bottom: 1rpx dashed var(--border-color);
+  1186|}
+  1187|.loading-more {
+  1188|  text-align: center;
+  1189|  padding: 32rpx;
+  1190|  color: var(--text-muted);
+  1191|  font-size: 26rpx;
+  1192|}
+  1193|.loading-prev {
+  1194|  text-align: center;
+  1195|  padding: 32rpx;
+  1196|  color: var(--text-muted);
+  1197|  font-size: 26rpx;
+  1198|  display: flex;
+  1199|  flex-direction: column;
+  1200|  align-items: center;
+  1201|  gap: 12rpx;
+  1202|}
+  1203|.loading-spinner {
+  1204|  width: 32rpx;
+  1205|  height: 32rpx;
+  1206|  border: 3rpx solid var(--text-muted);
+  1207|  border-top-color: var(--accent);
+  1208|  border-radius: 50%;
+  1209|  animation: spin 0.8s linear infinite;
+  1210|}
+  1211|@keyframes spin {
+  1212|  to { transform: rotate(360deg); }
+  1213|}
+  1214|.loading-more {
+  1215|  text-align: center;
+  1216|  padding: 32rpx;
+  1217|  color: var(--text-muted);
+  1218|  font-size: 26rpx;
+  1219|}
+  1220|.book-end {
+  1221|  text-align: center;
+  1222|  padding: 64rpx 32rpx 120rpx;
+  1223|  color: var(--text-muted);
+  1224|  font-size: 28rpx;
+  1225|}
+  1226|
+  1227|/* 底部设置面板 */
+  1228|.bottom-settings {
+  1229|  position: fixed;
+  1230|  bottom: -600rpx;
+  1231|  left: 0;
+  1232|  right: 0;
+  1233|  background: var(--panel-bg);
+  1234|  backdrop-filter: blur(20rpx);
+  1235|  padding: 24rpx 32rpx;
+  1236|  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  1237|  border-top: 1rpx solid var(--border-color);
+  1238|  opacity: 0;
+  1239|  visibility: hidden;
+  1240|  pointer-events: none;
+  1241|  transition: bottom 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+  1242|  z-index: 101;
+  1243|  max-height: 60vh;
+  1244|  overflow-y: auto;
+  1245|}
+  1246|.bottom-settings.show {
+  1247|  bottom: 140rpx;
+  1248|  opacity: 1;
+  1249|  visibility: visible;
+  1250|  pointer-events: auto;
+  1251|}
+  1252|.setting-row {
+  1253|  display: flex;
+  1254|  align-items: center;
+  1255|  padding: 16rpx 0;
+  1256|  gap: 24rpx;
+  1257|}
+  1258|.setting-row.theme-row {
+  1259|  padding-top: 24rpx;
+  1260|}
+  1261|.setting-label {
+  1262|  font-size: 28rpx;
+  1263|  color: var(--text-primary);
+  1264|  min-width: 100rpx;
+  1265|  flex-shrink: 0;
+  1266|}
+  1267|.setting-control {
+  1268|  flex: 1;
+  1269|  display: flex;
+  1270|  align-items: center;
+  1271|  gap: 16rpx;
+  1272|}
+  1273|.font-btn {
+  1274|  padding: 12rpx 28rpx;
+  1275|  background: var(--border-color);
+  1276|  border-radius: 8rpx;
+  1277|  font-size: 26rpx;
+  1278|  color: var(--text-primary);
+  1279|  min-width: 60rpx;
+  1280|  text-align: center;
+  1281|}
+  1282|.font-value {
+  1283|  font-size: 28rpx;
+  1284|  color: var(--text-primary);
+  1285|  min-width: 40rpx;
+  1286|  text-align: center;
+  1287|  font-weight: 500;
+  1288|}
+  1289|.setting-slider {
+  1290|  flex: 1;
+  1291|  margin: 0;
+  1292|}
+  1293|.theme-btns {
+  1294|  display: flex;
+  1295|  gap: 20rpx;
+  1296|}
+  1297|.font-options {
+  1298|  display: flex;
+  1299|  gap: 16rpx;
+  1300|}
+  1301|.font-option {
+  1302|  padding: 12rpx 24rpx;
+  1303|  border-radius: 12rpx;
+  1304|  background: var(--page-bg);
+  1305|  border: 2rpx solid var(--border-color);
+  1306|}
+  1307|.font-option.active {
+  1308|  border-color: var(--accent);
+  1309|  background: rgba(184, 69, 26, 0.1);
+  1310|}
+  1311|.font-label {
+  1312|  font-size: 24rpx;
+  1313|  color: var(--text-primary);
+  1314|}
+  1315|.page-turn-options {
+  1316|  display: flex;
+  1317|  gap: 16rpx;
+  1318|}
+  1319|.page-turn-option {
+  1320|  padding: 12rpx 24rpx;
+  1321|  border-radius: 12rpx;
+  1322|  background: var(--page-bg);
+  1323|  border: 2rpx solid var(--border-color);
+  1324|}
+  1325|.page-turn-option.active {
+  1326|  border-color: var(--accent);
+  1327|  background: rgba(184, 69, 26, 0.1);
+  1328|}
+  1329|.page-turn-label {
+  1330|  font-size: 24rpx;
+  1331|  color: var(--text-primary);
+  1332|}
+  1333|.theme-btn {
+  1334|  width: 80rpx;
+  1335|  height: 80rpx;
+  1336|  border-radius: 16rpx;
+  1337|  display: flex;
+  1338|  align-items: center;
+  1339|  justify-content: center;
+  1340|  border: 4rpx solid transparent;
+  1341|  transition: transform 0.2s ease;
+  1342|}
+  1343|.theme-btn.active {
+  1344|  border-color: var(--accent);
+  1345|  transform: scale(1.05);
+  1346|}
+  1347|.theme-label {
+  1348|  font-size: 20rpx;
+  1349|  font-weight: 600;
+  1350|}
+  1351|
+  1352|/* 底部工具栏 */
+  1353|.bottom-bar {
+  1354|  position: fixed;
+  1355|  bottom: -200rpx;
+  1356|  left: 0;
+  1357|  right: 0;
+  1358|  background: var(--panel-bg);
+  1359|  backdrop-filter: blur(20rpx);
+  1360|  padding: 16rpx 32rpx;
+  1361|  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  1362|  border-top: 1rpx solid var(--border-color);
+  1363|  opacity: 0;
+  1364|  visibility: hidden;
+  1365|  pointer-events: none;
+  1366|  transition: bottom 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+  1367|  z-index: 100;
+  1368|}
+  1369|.bottom-bar.show {
+  1370|  bottom: 0;
+  1371|  opacity: 1;
+  1372|  visibility: visible;
+  1373|  pointer-events: auto;
+  1374|}
+  1375|.progress-section {
+  1376|  padding: 0 16rpx 16rpx;
+  1377|}
+  1378|.chapter-slider {
+  1379|  margin: 0;
+  1380|}
+  1381|.progress-text {
+  1382|  font-size: 22rpx;
+  1383|  color: var(--text-muted);
+  1384|  text-align: center;
+  1385|  margin-top: 4rpx;
+  1386|}
+  1387|.bottom-actions {
+  1388|  display: flex;
+  1389|  justify-content: space-around;
+  1390|  align-items: center;
+  1391|  padding-top: 8rpx;
+  1392|}
+  1393|.action-btn {
+  1394|  display: flex;
+  1395|  flex-direction: column;
+  1396|  align-items: center;
+  1397|  padding: 12rpx 24rpx;
+  1398|  gap: 4rpx;
+  1399|}
+  1400|.action-icon {
+  1401|  font-size: 32rpx;
+  1402|  color: var(--text-primary);
+  1403|}
+  1404|.action-text {
+  1405|  font-size: 22rpx;
+  1406|  color: var(--text-secondary);
+  1407|}
+  1408|
+  1409|/* 锁定覆盖层 */
+  1410|.lock-overlay {
+  1411|  display: flex;
+  1412|  flex-direction: column;
+  1413|  align-items: center;
+  1414|  justify-content: center;
+  1415|  padding: 120rpx 48rpx;
+  1416|  min-height: 60vh;
+  1417|}
+  1418|.lock-icon {
+  1419|  font-size: 80rpx;
+  1420|  margin-bottom: 32rpx;
+  1421|}
+  1422|.lock-title {
+  1423|  font-size: 36rpx;
+  1424|  font-weight: 700;
+  1425|  color: var(--text-title);
+  1426|  margin-bottom: 16rpx;
+  1427|}
+  1428|.lock-desc {
+  1429|  font-size: 26rpx;
+  1430|  color: var(--text-secondary);
+  1431|  margin-bottom: 48rpx;
+  1432|  text-align: center;
+  1433|}
+  1434|.unlock-ad-btn {
+  1435|  background: var(--accent);
+  1436|  padding: 24rpx 64rpx;
+  1437|  border-radius: 48rpx;
+  1438|  margin-bottom: 24rpx;
+  1439|}
+  1440|.unlock-ad-text {
+  1441|  font-size: 30rpx;
+  1442|  color: var(--text-title);
+  1443|  font-weight: 600;
+  1444|}
+  1445|.lock-hint {
+  1446|  font-size: 24rpx;
+  1447|  color: var(--text-muted);
+  1448|}
+  1449|
+  1450|/* 广告弹窗 */
+  1451|.ad-modal {
+  1452|  position: fixed;
+  1453|  top: 0;
+  1454|  left: 0;
+  1455|  right: 0;
+  1456|  bottom: 0;
+  1457|  background: rgba(0,0,0,0.85);
+  1458|  display: flex;
+  1459|  align-items: center;
+  1460|  justify-content: center;
+  1461|  z-index: 200;
+  1462|}
+  1463|.ad-content {
+  1464|  width: 80%;
+  1465|  background: var(--panel-bg);
+  1466|  border-radius: 16rpx;
+  1467|  overflow: hidden;
+  1468|}
+  1469|.ad-header {
+  1470|  display: flex;
+  1471|  justify-content: space-between;
+  1472|  align-items: center;
+  1473|  padding: 24rpx 32rpx;
+  1474|  background: var(--border-color);
+  1475|}
+  1476|.ad-title {
+  1477|  font-size: 30rpx;
+  1478|  font-weight: 600;
+  1479|  color: var(--text-title);
+  1480|}
+  1481|.ad-close {
+  1482|  font-size: 40rpx;
+  1483|  color: var(--text-secondary);
+  1484|}
+  1485|.ad-body {
+  1486|  padding: 48rpx 32rpx;
+  1487|  display: flex;
+  1488|  flex-direction: column;
+  1489|  align-items: center;
+  1490|  gap: 16rpx;
+  1491|}
+  1492|.ad-brand {
+  1493|  font-size: 32rpx;
+  1494|  font-weight: 700;
+  1495|  color: var(--text-title);
+  1496|  text-align: center;
+  1497|}
+  1498|.ad-desc {
+  1499|  font-size: 26rpx;
+  1500|  color: var(--text-primary);
+  1501|  text-align: center;
+  1502|  line-height: 1.5;
+  1503|}
+  1504|.ad-progress-bar {
+  1505|  width: 100%;
+  1506|  height: 12rpx;
+  1507|  background: var(--border-color);
+  1508|  border-radius: 6rpx;
+  1509|  margin-top: 24rpx;
+  1510|}
+  1511|.ad-progress-fill {
+  1512|  height: 100%;
+  1513|  background: var(--accent);
+  1514|  border-radius: 6rpx;
+  1515|  transition: width 0.1s linear;
+  1516|}
+  1517|.ad-progress-text {
+  1518|  font-size: 24rpx;
+  1519|  color: var(--text-secondary);
+  1520|  margin-top: 12rpx;
+  1521|}
+  1522|
+  1523|/* 目录弹窗 */
+  1524|.catalog-modal {
+  1525|  position: fixed;
+  1526|  top: 0;
+  1527|  left: 0;
+  1528|  right: 0;
+  1529|  bottom: 0;
+  1530|  background: rgba(0,0,0,0.6);
+  1531|  display: flex;
+  1532|  align-items: flex-end;
+  1533|  z-index: 150;
+  1534|}
+  1535|.catalog-content {
+  1536|  width: 100%;
+  1537|  max-height: 70vh;
+  1538|  background: var(--panel-bg);
+  1539|  border-radius: 32rpx 32rpx 0 0;
+  1540|  padding: 32rpx;
+  1541|  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  1542|}
+  1543|.catalog-title {
+  1544|  font-size: 36rpx;
+  1545|  font-weight: 600;
+  1546|  color: var(--text-title);
+  1547|  margin-bottom: 24rpx;
+  1548|  text-align: center;
+  1549|}
+  1550|.catalog-list {
+  1551|  max-height: 55vh;
+  1552|}
+  1553|.catalog-item {
+  1554|  display: flex;
+  1555|  justify-content: space-between;
+  1556|  align-items: center;
+  1557|  padding: 24rpx 0;
+  1558|  border-bottom: 1rpx solid var(--border-color);
+  1559|}
+  1560|.catalog-item-title {
+  1561|  font-size: 30rpx;
+  1562|  color: var(--text-primary);
+  1563|  flex: 1;
+  1564|  overflow: hidden;
+  1565|  text-overflow: ellipsis;
+  1566|  white-space: nowrap;
+  1567|}
+  1568|.catalog-lock {
+  1569|  font-size: 24rpx;
+  1570|  color: var(--accent);
+  1571|  padding: 4rpx 16rpx;
+  1572|  background: rgba(184, 69, 26, 0.1);
+  1573|  border-radius: 8rpx;
+  1574|}
+  1575|.catalog-free {
+  1576|  font-size: 24rpx;
+  1577|  color: #2D6A4F;
+  1578|  padding: 4rpx 16rpx;
+  1579|  background: rgba(45, 106, 79, 0.1);
+  1580|  border-radius: 8rpx;
+  1581|}
+  1582|
+  1583|/* ========== 翻页动画 ========== */
+  1584|
+  1585|/* slide: 淡入位移 */
+  1586|@keyframes slideLeftIn {
+  1587|  from { opacity: 0; transform: translateX(60rpx); }
+  1588|  to { opacity: 1; transform: translateX(0); }
+  1589|}
+  1590|@keyframes slideRightIn {
+  1591|  from { opacity: 0; transform: translateX(-60rpx); }
+  1592|  to { opacity: 1; transform: translateX(0); }
+  1593|}
+  1594|.anim-slide-left {
+  1595|  animation: slideLeftIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1596|}
+  1597|.anim-slide-right {
+  1598|  animation: slideRightIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1599|}
+  1600|
+  1601|/* cover: 覆盖翻页 */
+  1602|@keyframes coverIn {
+  1603|  from { opacity: 0; transform: translateX(100%); }
+  1604|  to { opacity: 1; transform: translateX(0); }
+  1605|}
+  1606|@keyframes coverOut {
+  1607|  from { opacity: 0; transform: translateX(-100%); }
+  1608|  to { opacity: 1; transform: translateX(0); }
+  1609|}
+  1610|.anim-cover-in {
+  1611|  animation: coverIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1612|}
+  1613|.anim-cover-out {
+  1614|  animation: coverOut 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1615|}
+  1616|
+  1617|/* sim: 仿真翻页（3D 旋转） */
+  1618|@keyframes simRight {
+  1619|  from { opacity: 0; transform: perspective(1200rpx) rotateY(-25deg) translateX(80rpx); }
+  1620|  to { opacity: 1; transform: perspective(1200rpx) rotateY(0) translateX(0); }
+  1621|}
+  1622|@keyframes simLeft {
+  1623|  from { opacity: 0; transform: perspective(1200rpx) rotateY(25deg) translateX(-80rpx); }
+  1624|  to { opacity: 1; transform: perspective(1200rpx) rotateY(0) translateX(0); }
+  1625|}
+  1626|.anim-sim-right {
+  1627|  animation: simRight 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1628|}
+  1629|.anim-sim-left {
+  1630|  animation: simLeft 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  1631|}
+  1632|</style>
+  1633|

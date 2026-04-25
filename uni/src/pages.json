@@ -1,0 +1,50 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/store/store",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/shelf/shelf",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/me",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/detail/detail",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/reader/reader",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/recharge/recharge",
+      "style": { "navigationStyle": "custom" }
+    }
+  ],
+  "tabBar": {
+    "custom": true,
+    "color": "#AAA",
+    "selectedColor": "#E8A23E",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "\u53d1\u73b0" },
+      { "pagePath": "pages/store/store", "text": "\u4e66\u57ce" },
+      { "pagePath": "pages/shelf/shelf", "text": "\u4e66\u67b6" },
+      { "pagePath": "pages/me/me", "text": "\u6211\u7684" }
+    ]
+  },
+  "globalStyle": {
+    "navigationStyle": "custom",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F0EA"
+  }
+}

@@ -1,0 +1,72 @@
+<!-- pages/index/index.wxml -->
+<view class="container">
+
+  <!-- 搜索栏 -->
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <text class="search-icon">🔍</text>
+      <input
+        class="search-input"
+        placeholder="搜索书名、作者"
+        placeholder-class="search-placeholder"
+        value="{{searchKeyword}}"
+        bindinput="onSearchInput"
+        bindconfirm="onSearchConfirm"
+      />
+    </view>
+  </view>
+
+  <!-- 轮播 Banner -->
+  <swiper class="banner-swiper" indicator-dots autoplay circular interval="3000">
+    <swiper-item wx:for="{{banners}}" wx:key="id" bindtap="onBannerTap" data-id="{{item.id}}">
+      <view class="banner-item" style="background: {{item.color}};">
+        <text class="banner-text">{{item.text}}</text>
+      </view>
+    </swiper-item>
+  </swiper>
+
+  <!-- 分类快捷入口 -->
+  <view class="card category-section">
+    <view class="category-list">
+      <view class="category-item" wx:for="{{categories}}" wx:key="id" bindtap="onCategoryTap" data-name="{{item.name}}">
+        <view class="category-icon">{{item.icon}}</view>
+        <text class="category-name">{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 精选推荐 -->
+  <view class="section-header">
+    <text class="section-title">精选推荐</text>
+    <text class="section-more">更多 ></text>
+  </view>
+  <scroll-view class="featured-scroll" scroll-x>
+    <view class="featured-list">
+      <view class="featured-item" wx:for="{{featuredBooks}}" wx:key="id" bindtap="onBookTap" data-id="{{item.id}}">
+        <view class="featured-cover cover-placeholder" style="background: {{item.coverColor}};">
+          {{item.title}}
+        </view>
+        <text class="featured-title ellipsis">{{item.title}}</text>
+        <text class="featured-author">{{item.author}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 短视频播报 -->
+  <view class="section-header">
+    <text class="section-title">短视频播报</text>
+  </view>
+  <view class="video-list">
+    <view class="video-item card" wx:for="{{videoBooks}}" wx:key="id" bindtap="onVideoTap" data-id="{{item.id}}">
+      <view class="video-cover cover-placeholder" style="background: {{item.coverColor}};">
+        <view class="video-play">▶</view>
+        <view class="video-duration">{{item.duration}}</view>
+      </view>
+      <view class="video-info">
+        <text class="video-title ellipsis">{{item.title}}</text>
+        <text class="video-author">{{item.author}}</text>
+      </view>
+    </view>
+  </view>
+
+</view>

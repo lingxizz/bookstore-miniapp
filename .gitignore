@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+uni/node_modules/
+
+# Build output
+uni/dist/
+uni/dist_build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Java build
+java-server/target/
+java-server/*.jar
+java-server/.gradle/
+
+# Screenshots & videos (too large for git)
+*.png
+*.jpg
+*.jpeg
+*.mp4
+!docs/images/
+
+# Other
+demo_video/
+videos/
