@@ -93,11 +93,11 @@
       <!-- Book list -->
       <view class="book-list" :class="{ 'managing': isManaging }">
         <view class="book-row" v-for="rec in filteredRecords" :key="rec.id"
-              :class="{ 'managing-row': isManaging }"
+              :class="{ 'managing-row': isManaging && shakingBookId === rec.bookId, 'other-row': isManaging && shakingBookId !== null && shakingBookId !== rec.bookId }"
               @click="isManaging ? null : goDetail(rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
-          <!-- 管理模式下右侧删除遮罩 -->
-          <view v-if="isManaging" class="delete-mask" @click="removeSingle(rec.bookId)">
+          <!-- 管理模式下仅长按书籍显示删除遮罩 -->
+          <view v-if="isManaging && shakingBookId === rec.bookId" class="delete-mask" @click="removeSingle(rec.bookId)">
             <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -230,7 +230,9 @@ function goReader(item: ExtendedShelfItem) {
 
 function toggleManage() {
   isManaging.value = !isManaging.value;
-  shakingBookId.value = null;
+  if (!isManaging.value) {
+    shakingBookId.value = null;
+  }
 }
 
 function onLongPress(bookId: number) {
@@ -594,11 +596,17 @@ async function removeSingle(bookId: number) {
   90% { transform: translateX(-1rpx) rotate(0deg); }
 }
 
-/* 管理模式：所有书籍内容左移 */
+/* 管理模式：仅长按的书籍内容左移 */
 .managing-row .book-cover,
 .managing-row .book-body {
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   transform: translateX(-80rpx);
+}
+
+/* 其他书不移 */
+.other-row .book-cover,
+.other-row .book-body {
+  transform: translateX(0);
 }
 
 /* 删除遮罩 */
