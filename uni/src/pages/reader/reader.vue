@@ -1040,30 +1040,37 @@ async function buyChapter() {
   top: 0;
   left: 0;
   right: 0;
+  height: 88rpx;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 36rpx 24rpx 16rpx;
+  padding: 0 24rpx;
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
   background: rgba(245, 240, 234, 0.98);
   backdrop-filter: blur(10px);
   z-index: 200;
   border-bottom: 1rpx solid rgba(0,0,0,0.05);
   transition: transform 0.3s ease;
+  box-sizing: border-box;
 }
 .dark-mode .reader-top {
   background: rgba(26, 26, 46, 0.95);
   border-bottom-color: #333;
 }
 .shelf-btn {
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #FFFFFF;
   background: #A34A2E;
-  padding: 10rpx 28rpx;
-  border-radius: 30rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  align-self: center;
+  justify-content: center;
+  line-height: 1;
+  height: 44rpx;
+  box-sizing: border-box;
 }
 .shelf-btn.in-shelf {
   background: #999999;
