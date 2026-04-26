@@ -1344,6 +1344,18 @@ async function buyChapter() {
 .dark-mode .settings-sheet {
   background: #1A1A2E;
 }
+/* 羊皮纸主题（默认） */
+.theme-light .settings-sheet {
+  background: #F5F0EA;
+}
+/* 纯白主题 */
+.theme-white .settings-sheet {
+  background: #FFFFFF;
+}
+/* 护眼主题 */
+.theme-green .settings-sheet {
+  background: #E8F5E9;
+}
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
