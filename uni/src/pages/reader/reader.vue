@@ -759,6 +759,13 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
+  // 同时更新下拉专用的起始坐标
+  pullStartX = e.touches[0].clientX;
+  pullStartY = e.touches[0].clientY;
+  // 如果上次加载已完成，重置下拉状态
+  if (pullState.value === 'loading' && !loadingPrev.value) {
+    resetPullState();
+  }
 }
 
 // 原生 touchmove 处理器（绑定 passive: false）
