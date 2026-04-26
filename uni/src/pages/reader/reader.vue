@@ -20,9 +20,13 @@
       @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <!-- 下拉提示 -->
-      <view v-if="pullState !== 'idle'" class="pull-hint" :style="{ height: pullOffset + 'px' }">
-        <text class="pull-hint-text">{{ pullState === 'will-load' ? '松开加载上一章' : '下拉加载上一章' }}</text>
+      <!-- 下拉加载指示器 -->
+      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
+        <view class="pull-spinner" :class="{ 'pull-spinner-active': pullState === 'loading' }">
+          <svg class="spinner" viewBox="0 0 50 50">
+            <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
+          </svg>
+        </view>
       </view>
 
       <!-- 上一章加载中 -->
@@ -336,7 +340,7 @@ const isInShelf = ref(false);
 const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
 const pullOffset = ref(0);
-const pullState = ref<'idle' | 'pulling' | 'will-load'>('idle');
+const pullState = ref<'idle' | 'pulling' | 'loading'>('idle');
 
 // 目录相关
 const catalogDesc = ref(false);
@@ -750,8 +754,15 @@ function onTouchMove(e: any) {
   }
   const dy = e.touches[0].clientY - touchStartY;
   if (dy > 0) {
-    pullOffset.value = Math.min(dy * 0.4, 150);
-    pullState.value = pullOffset.value > 80 ? 'will-load' : 'pulling';
+    pullOffset.value = Math.min(dy * 0.4, 120);
+    // 下拉超过阈值直接触发加载，不需要松手
+    if (pullState.value !== 'loading' && pullOffset.value >= 60) {
+      pullState.value = 'loading';
+      pullOffset.value = 50; // 固定高度，显示加载中
+      autoLoadPrev();
+    } else if (pullState.value !== 'loading') {
+      pullState.value = 'pulling';
+    }
   } else {
     pullOffset.value = 0;
     pullState.value = 'idle';
@@ -763,16 +774,11 @@ function onTouchEnd(e: any) {
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
 
-  // 下拉加载上一章：必须在顶部且下拉超过阈值
-  if (pullState.value === 'will-load' && Math.abs(dx) < 40 && dt < 1000) {
-    const el = getScrollEl();
-    if (el && el.scrollTop <= 0) {
-      pullState.value = 'idle';
-      pullOffset.value = 0;
-      autoLoadPrev();
-      return;
-    }
+  // 如果正在加载中，忽略点击判断
+  if (pullState.value === 'loading') {
+    return;
   }
+
   pullState.value = 'idle';
   pullOffset.value = 0;
 
@@ -1522,18 +1528,28 @@ async function buyChapter() {
   flex-direction: row;
   pointer-events: none;
 }
-.tap-zone {
-  height: 100%;
-  pointer-events: auto;
+/* 下拉加载指示器 */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 0.15s ease;
 }
-.tap-left {
-  width: 30%;
+.pull-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
 }
-.tap-center {
-  width: 40%;
+.pull-spinner-active {
+  opacity: 1;
 }
-.tap-right {
-  width: 30%;
+.pull-spinner .spinner {
+  width: 32rpx;
+  height: 32rpx;
+  animation: rotate 0.8s linear infinite;
 }
 
 /* 加载中 spinner */
