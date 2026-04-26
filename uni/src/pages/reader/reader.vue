@@ -125,7 +125,7 @@
         </scroll-view>
 
         <!-- 章节列表 -->
-        <scroll-view class="catalog-list" scroll-y>
+        <scroll-view class="catalog-list" scroll-y @touchmove.stop @catchtouchmove.stop>
           <view
             v-for="ch in displayedCatalogChapters"
             :key="ch.id"
@@ -1329,6 +1329,8 @@ async function buyChapter() {
   flex-direction: column;
   justify-content: flex-end;
   transition: opacity 0.3s ease;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 .catalog-mask.mask-hidden {
   opacity: 0;
@@ -1348,6 +1350,8 @@ async function buyChapter() {
   padding: 16rpx 0 32rpx;
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   width: 100%;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .catalog-mask.mask-hidden .catalog-sheet {
   transform: translateY(100%);
@@ -1464,6 +1468,9 @@ async function buyChapter() {
 .catalog-list {
   flex: 1;
   padding: 8rpx 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 .catalog-item {
   display: flex;
