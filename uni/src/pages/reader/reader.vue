@@ -1,11 +1,18 @@
 <template>
   <view class="reader-page" :class="{ 'dark-mode': isDark }" :style="pageStyle">
-    <!-- 顶部栏 -->
-    <view class="reader-top" v-if="showMenu" @click.stop>
+    <!-- 左上角常驻信息 -->
+    <view class="reader-info" @click.stop>
       <text class="back-btn" @click="goBack">←</text>
       <text class="chapter-title">{{ currentTitle }}</text>
-      <text class="menu-btn" @click="showCatalog = true">☰</text>
     </view>
+
+    <!-- 顶部菜单栏（点击屏幕中央触发） -->
+    <transition name="slide-down">
+      <view class="reader-top" v-if="showMenu" @click.stop>
+        <view style="width: 60rpx" />
+        <text class="shelf-btn" :class="{ 'in-shelf': isInShelf }" @click="toggleShelf">{{ isInShelf ? '已加书架' : '加入书架' }}</text>
+      </view>
+    </transition>
 
     <!-- 内容区 -->
     <view
@@ -71,24 +78,26 @@
 
 
     <!-- 底部栏 -->
-    <view class="reader-bottom" v-if="showMenu" @click.stop>
-      <view class="bottom-item" @click="openSettings">
-        <text class="bottom-icon">Aa</text>
-        <text class="bottom-label">设置</text>
+    <transition name="slide-up">
+      <view class="reader-bottom" v-if="showMenu" @click.stop>
+        <view class="bottom-item" @click="showCatalog = true">
+          <text class="bottom-icon">☰</text>
+          <text class="bottom-label">目录</text>
+        </view>
+        <view class="bottom-item" @click="toggleDarkQuick">
+          <text class="bottom-icon">{{ isDark ? '☀' : '☾' }}</text>
+          <text class="bottom-label">{{ isDark ? '日间' : '夜间' }}</text>
+        </view>
+        <view class="bottom-item" @click="openSettings">
+          <text class="bottom-icon">Aa</text>
+          <text class="bottom-label">设置</text>
+        </view>
       </view>
-      <view class="bottom-item" @click="showCatalog = true">
-        <text class="bottom-icon">☰</text>
-        <text class="bottom-label">目录</text>
-      </view>
-      <view class="bottom-item" @click="toggleDarkQuick">
-        <text class="bottom-icon">{{ isDark ? '☀' : '☾' }}</text>
-        <text class="bottom-label">{{ isDark ? '日间' : '夜间' }}</text>
-      </view>
-    </view>
+    </transition>
 
     <!-- 目录弹窗 -->
     <view class="catalog-mask" v-if="showCatalog" @click="showCatalog = false">
-      <view class="catalog-panel" @click.stop>
+      <view class="catalog-panel" @click.stop :style="{ backgroundColor: panelBg }">
         <view class="catalog-header">
           <text class="catalog-title">章节目录</text>
           <text class="catalog-close" @click="showCatalog = false">✕</text>
@@ -299,6 +308,7 @@ const showCatalog = ref(false);
 const showSettingsPanel = ref(false);
 const showAdUnlock = ref(false);
 const currentScrollTop = ref(0);
+const isInShelf = ref(false);
 const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
 const pullOffset = ref(0);
@@ -321,6 +331,16 @@ const config = ref({
 });
 
 const isDark = computed(() => config.value.theme === 'dark');
+
+const panelBg = computed(() => {
+  const map: Record<string, string> = {
+    light: '#F5F0EA',
+    white: '#FFFFFF',
+    green: '#E8F5E9',
+    dark: '#1A1A2E',
+  };
+  return map[config.value.theme] || '#F5F0EA';
+});
 
 const pageStyle = computed(() => {
   const map: Record<string, string> = {
@@ -406,6 +426,7 @@ onLoad(async (opts: any) => {
     const book = await fetchBook(bookId.value);
     bookWordCount.value = book?.wordCount || 0;
   } catch {}
+  checkShelfStatus();
   await loadChapters();
   await loadCurrentChapter();
 });
@@ -844,6 +865,26 @@ function goBack() {
   uni.navigateBack();
 }
 
+function toggleShelf() {
+  const shelfKey = 'shelf_books';
+  const shelf = uni.getStorageSync(shelfKey) || [];
+  const idx = shelf.findIndex((b: any) => b.id === bookId.value);
+  if (idx >= 0) {
+    shelf.splice(idx, 1);
+    isInShelf.value = false;
+  } else {
+    const book = { id: bookId.value, title: currentTitle.value || '未知书籍', addedAt: Date.now() };
+    shelf.unshift(book);
+    isInShelf.value = true;
+  }
+  uni.setStorageSync(shelfKey, shelf);
+}
+
+function checkShelfStatus() {
+  const shelf = uni.getStorageSync('shelf_books') || [];
+  isInShelf.value = shelf.some((b: any) => b.id === bookId.value);
+}
+
 async function selectChapter(ch: Chapter) {
   showCatalog.value = false;
   chapterId.value = ch.id;
@@ -957,6 +998,38 @@ async function buyChapter() {
   overflow: hidden;
 }
 
+/* 左上角常驻信息 */
+.reader-info {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  padding: 60rpx 32rpx 24rpx;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+  pointer-events: none;
+}
+.reader-info .back-btn {
+  pointer-events: auto;
+  font-size: 36rpx;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 8rpx;
+  min-width: 60rpx;
+}
+.reader-info .chapter-title {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 24rpx;
+}
+
 /* 顶部栏 */
 .reader-top {
   position: fixed;
@@ -966,11 +1039,11 @@ async function buyChapter() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24rpx 32rpx;
-  background: rgba(245, 240, 234, 0.95);
-  backdrop-filter: blur(10rpx);
-  z-index: 50;
-  border-bottom: 1rpx solid #E8E2D8;
+  padding: 50rpx 24rpx 20rpx;
+  background: rgba(245, 240, 234, 0.98);
+  backdrop-filter: blur(10px);
+  z-index: 200;
+  border-bottom: 1rpx solid rgba(0,0,0,0.05);
   transition: transform 0.3s ease;
 }
 .dark-mode .reader-top {
