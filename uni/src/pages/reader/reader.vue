@@ -13,6 +13,10 @@
       scroll-y
       :scroll-top="scrollTop"
       @scroll="onScroll"
+      @scrolltolower="onScrollToLower"
+      @scrolltoupper="onScrollToUpper"
+      lower-threshold="500"
+      upper-threshold="100"
       :style="{ filter: `brightness(${config.brightness}%)` }"
     >
       <view v-if="loadingPrev" class="loading-bar">
@@ -90,10 +94,10 @@
     </view>
 
     <!-- 全屏设置面板 -->
-    <view class="settings-fullscreen" v-if="showSettingsPanel" @click.stop>
+    <view class="settings-fullscreen" v-if="showSettingsPanel" @click.stop :class="{ 'dark-mode': isDark }" :style="settingsPanelStyle">
       <view class="settings-header">
-        <text class="settings-title">阅读设置</text>
-        <text class="settings-close-btn" @click="showSettingsPanel = false">✕</text>
+        <text class="settings-title" :class="{ 'dark-text': isDark }">阅读设置</text>
+        <text class="settings-close-btn" :class="{ 'dark-text': isDark }" @click="showSettingsPanel = false">✕</text>
       </view>
 
       <view class="settings-tabs">
@@ -101,10 +105,10 @@
           class="settings-tab"
           v-for="tab in settingsTabs"
           :key="tab.key"
-          :class="{ active: activeSettingsTab === tab.key }"
+          :class="{ active: activeSettingsTab === tab.key, 'dark-mode': isDark }"
           @click="activeSettingsTab = tab.key"
         >
-          <text>{{ tab.label }}</text>
+          <text :class="{ 'dark-text': isDark }">{{ tab.label }}</text>
         </view>
       </view>
 
@@ -276,6 +280,16 @@ const pageStyle = computed(() => {
   return { backgroundColor: map[config.value.theme] || '#F5F0EA' };
 });
 
+const settingsPanelStyle = computed(() => {
+  const map: Record<string, string> = {
+    light: '#F5F0EA',
+    white: '#FFFFFF',
+    green: '#E8F5E9',
+    dark: '#1A1A2E',
+  };
+  return { backgroundColor: map[config.value.theme] || '#F5F0EA' };
+});
+
 const textStyle = computed(() => {
   const fontMap: Record<string, string> = {
     serif: "'Noto Serif SC', serif",
@@ -430,20 +444,16 @@ function getPrevChapter() {
 
 function onScroll(e: any) {
   currentScrollTop.value = e.detail.scrollTop;
+}
 
+function onScrollToLower() {
   if (config.value.pagingMode !== 'scroll') return;
+  autoLoadNext();
+}
 
-  const { scrollTop, scrollHeight, clientHeight } = e.detail;
-
-  // 接近底部，自动加载下一章
-  if (!loadingNext.value && scrollHeight - scrollTop - clientHeight < 300) {
-    autoLoadNext();
-  }
-
-  // 接近顶部，自动加载上一章
-  if (!loadingPrev.value && scrollTop < 100 && sections.value.length > 0) {
-    autoLoadPrev();
-  }
+function onScrollToUpper() {
+  if (config.value.pagingMode !== 'scroll') return;
+  autoLoadPrev();
 }
 
 async function autoLoadNext() {
@@ -710,19 +720,21 @@ async function buyChapter() {
   font-family: 'Noto Sans SC', sans-serif;
 }
 
-/* 点击区域 */
+/* 点击区域 - pointer-events: none 避免拦截滚动 */
 .tap-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 10;
+  z-index: 5;
   display: flex;
   flex-direction: row;
+  pointer-events: none;
 }
 .tap-zone {
   height: 100%;
+  pointer-events: auto;
 }
 .tap-left {
   width: 30%;
@@ -848,6 +860,32 @@ async function buyChapter() {
   font-size: 24rpx;
 }
 
+/* 点击区域 - 不拦截滚动 */
+.tap-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: row;
+  pointer-events: none;
+}
+.tap-zone {
+  height: 100%;
+  pointer-events: auto;
+}
+.tap-left {
+  width: 30%;
+}
+.tap-center {
+  width: 40%;
+}
+.tap-right {
+  width: 30%;
+}
+
 /* 全屏设置面板 */
 .settings-fullscreen {
   position: fixed;
@@ -855,7 +893,6 @@ async function buyChapter() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -870,35 +907,55 @@ async function buyChapter() {
 .settings-title {
   font-size: 36rpx;
   font-weight: 700;
-  color: #FFFFFF;
+  color: #2C2C2C;
   font-family: 'Noto Serif SC', serif;
+}
+.settings-title.dark-text {
+  color: #EEEEEE;
 }
 .settings-close-btn {
   font-size: 32rpx;
-  color: #AAAAAA;
+  color: #888888;
   padding: 8rpx;
+}
+.settings-close-btn.dark-text {
+  color: #AAAAAA;
 }
 .settings-tabs {
   display: flex;
+  justify-content: center;
   gap: 16rpx;
   margin-bottom: 32rpx;
-  border-bottom: 1rpx solid rgba(255,255,255,0.1);
+  border-bottom: 1rpx solid rgba(163, 74, 46, 0.15);
   padding-bottom: 16rpx;
 }
+.dark-mode .settings-tabs {
+  border-bottom-color: rgba(255,255,255,0.1);
+}
 .settings-tab {
-  padding: 12rpx 24rpx;
+  padding: 12rpx 32rpx;
   border-radius: 48rpx;
+  background: rgba(163, 74, 46, 0.08);
+}
+.dark-mode .settings-tab {
+  background: rgba(255,255,255,0.08);
 }
 .settings-tab text {
   font-size: 28rpx;
-  color: #AAAAAA;
+  color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
 }
+.dark-mode .settings-tab text {
+  color: #AAAAAA;
+}
 .settings-tab.active {
-  background: rgba(163, 74, 46, 0.8);
+  background: #A34A2E;
 }
 .settings-tab.active text {
   color: #FFFFFF;
+}
+.dark-mode .settings-tab.active {
+  background: rgba(163, 74, 46, 0.9);
 }
 .settings-body-scroll {
   flex: 1;
@@ -911,10 +968,13 @@ async function buyChapter() {
 }
 .setting-group-title {
   font-size: 26rpx;
-  color: #CCCCCC;
+  color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
   margin-bottom: 16rpx;
   display: block;
+}
+.dark-mode .setting-group-title {
+  color: #AAAAAA;
 }
 .font-size-control {
   display: flex;
@@ -924,17 +984,24 @@ async function buyChapter() {
 }
 .size-btn {
   font-size: 32rpx;
-  color: #FFFFFF;
+  color: #2C2C2C;
   padding: 12rpx 24rpx;
-  background: rgba(255,255,255,0.1);
+  background: rgba(163, 74, 46, 0.08);
   border-radius: 12rpx;
+}
+.dark-mode .size-btn {
+  color: #EEEEEE;
+  background: rgba(255,255,255,0.1);
 }
 .size-value {
   font-size: 36rpx;
-  color: #FFFFFF;
+  color: #2C2C2C;
   font-weight: 600;
   min-width: 80rpx;
   text-align: center;
+}
+.dark-mode .size-value {
+  color: #EEEEEE;
 }
 .btn-group {
   display: flex;
@@ -944,14 +1011,21 @@ async function buyChapter() {
 .group-btn {
   padding: 12rpx 28rpx;
   border-radius: 48rpx;
-  background: rgba(255,255,255,0.1);
+  background: rgba(163, 74, 46, 0.08);
   font-size: 26rpx;
-  color: #CCCCCC;
+  color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .group-btn {
+  background: rgba(255,255,255,0.1);
+  color: #CCCCCC;
 }
 .group-btn.active {
   background: #A34A2E;
   color: #FFFFFF;
+}
+.dark-mode .group-btn.active {
+  background: rgba(163, 74, 46, 0.9);
 }
 .theme-options {
   display: flex;
@@ -980,17 +1054,24 @@ async function buyChapter() {
 }
 .brightness-btn {
   font-size: 32rpx;
-  color: #FFFFFF;
+  color: #2C2C2C;
   padding: 8rpx 16rpx;
-  background: rgba(255,255,255,0.1);
+  background: rgba(163, 74, 46, 0.08);
   border-radius: 12rpx;
+}
+.dark-mode .brightness-btn {
+  color: #EEEEEE;
+  background: rgba(255,255,255,0.1);
 }
 .brightness-bar {
   flex: 1;
   height: 8rpx;
-  background: rgba(255,255,255,0.2);
+  background: rgba(163, 74, 46, 0.15);
   border-radius: 4rpx;
   overflow: hidden;
+}
+.dark-mode .brightness-bar {
+  background: rgba(255,255,255,0.2);
 }
 .brightness-fill {
   height: 100%;
@@ -1000,13 +1081,19 @@ async function buyChapter() {
 }
 .setting-hint {
   padding: 16rpx;
-  background: rgba(255,255,255,0.05);
+  background: rgba(163, 74, 46, 0.06);
   border-radius: 12rpx;
+}
+.dark-mode .setting-hint {
+  background: rgba(255,255,255,0.05);
 }
 .setting-hint text {
   font-size: 24rpx;
   color: #888888;
   font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .setting-hint text {
+  color: #888888;
 }
 
 /* 广告解锁弹窗 */
