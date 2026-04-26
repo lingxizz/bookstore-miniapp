@@ -7,11 +7,9 @@
     </view>
 
     <!-- 顶部菜单栏（点击屏幕中央触发） -->
-    <transition name="slide-down">
-      <view class="reader-top" v-if="showMenu" @click.stop>
-        <text class="shelf-btn" :class="{ 'in-shelf': isInShelf }" @click="toggleShelf">{{ isInShelf ? '已加书架' : '加入书架' }}</text>
-      </view>
-    </transition>
+    <view class="reader-top" :class="{ 'menu-hidden': !showMenu, 'menu-visible': showMenu }" @click.stop>
+      <text class="shelf-btn" :class="{ 'in-shelf': isInShelf }" @click="toggleShelf">{{ isInShelf ? '已加书架' : '加入书架' }}</text>
+    </view>
 
     <!-- 内容区 -->
     <view
@@ -77,22 +75,20 @@
 
 
     <!-- 底部栏 -->
-    <transition name="slide-up">
-      <view class="reader-bottom" v-if="showMenu" @click.stop>
-        <view class="bottom-item" @click="showCatalog = true">
-          <text class="bottom-icon">☰</text>
-          <text class="bottom-label">目录</text>
-        </view>
-        <view class="bottom-item" @click="toggleDarkQuick">
-          <text class="bottom-icon">{{ isDark ? '☀' : '☾' }}</text>
-          <text class="bottom-label">{{ isDark ? '日间' : '夜间' }}</text>
-        </view>
-        <view class="bottom-item" @click="openSettings">
-          <text class="bottom-icon">Aa</text>
-          <text class="bottom-label">设置</text>
-        </view>
+    <view class="reader-bottom" :class="{ 'menu-hidden': !showMenu, 'menu-visible': showMenu }" @click.stop>
+      <view class="bottom-item" @click="showCatalog = true">
+        <text class="bottom-icon">☰</text>
+        <text class="bottom-label">目录</text>
       </view>
-    </transition>
+      <view class="bottom-item" @click="toggleDarkQuick">
+        <text class="bottom-icon">{{ isDark ? '☀' : '☾' }}</text>
+        <text class="bottom-label">{{ isDark ? '日间' : '夜间' }}</text>
+      </view>
+      <view class="bottom-item" @click="openSettings">
+        <text class="bottom-icon">Aa</text>
+        <text class="bottom-label">设置</text>
+      </view>
+    </view>
 
     <!-- 目录弹窗 -->
     <view class="catalog-mask" v-if="showCatalog" @click="showCatalog = false">
@@ -1099,8 +1095,18 @@ async function buyChapter() {
   backdrop-filter: blur(10px);
   z-index: 200;
   border-bottom: 1rpx solid rgba(0,0,0,0.05);
-  transition: transform 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease;
   box-sizing: border-box;
+}
+.reader-top.menu-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.reader-top.menu-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 .dark-mode .reader-top {
   background: rgba(26, 26, 46, 0.95);
@@ -1198,7 +1204,17 @@ async function buyChapter() {
   backdrop-filter: blur(10rpx);
   z-index: 50;
   border-top: 1rpx solid #E8E2D8;
-  transition: transform 0.3s ease;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease;
+}
+.reader-bottom.menu-hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.reader-bottom.menu-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 .dark-mode .reader-bottom {
   background: rgba(26, 26, 46, 0.95);
