@@ -738,7 +738,7 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
-  // 只在非 loading 状态重置，避免加载完成后状态被覆盖
+  // 每次 touchstart 都重置，只有真正进入 loading 才由 autoLoadPrev 控制
   if (pullState.value !== 'loading') {
     pullState.value = 'idle';
     pullOffset.value = 0;
@@ -756,9 +756,8 @@ function onTouchMove(e: any) {
     return;
   }
 
-  // 如果正在加载中，固定下拉高度，不响应新的拉动
-  if (pullState.value === 'loading' || loadingPrev.value) {
-    pullOffset.value = 40;
+  // 如果正在加载中，忽略新的拉动
+  if (pullState.value === 'loading') {
     return;
   }
 
@@ -768,12 +767,12 @@ function onTouchMove(e: any) {
     const damped = Math.min(dy * 0.35, 80);
     pullOffset.value = damped;
 
-    // 下拉超过阈值触发加载（仅在非 loading 状态触发）
-    if (pullOffset.value >= 50 && pullState.value !== 'loading' && !loadingPrev.value) {
+    // 下拉超过阈值触发加载
+    if (pullOffset.value >= 50 && pullState.value !== 'loading') {
       pullState.value = 'loading';
       pullOffset.value = 40; // 固定高度，显示加载中
       autoLoadPrev();
-    } else if (pullState.value !== 'loading') {
+    } else {
       pullState.value = 'pulling';
     }
   } else {
@@ -787,17 +786,14 @@ function onTouchEnd(e: any) {
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
 
-  // 如果正在加载中，忽略点击判断，但 touchend 时不再强制重置状态
-  // 让 autoLoadPrev 的 finally 来重置
-  if (pullState.value === 'loading' || loadingPrev.value) {
+  // 如果正在加载中，忽略点击判断
+  if (pullState.value === 'loading') {
     return;
   }
 
-  // 只有在非 loading 状态才重置
-  if (pullState.value !== 'loading') {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
-  }
+  // 非 loading 状态：重置下拉
+  pullState.value = 'idle';
+  pullOffset.value = 0;
 
   // 移动距离大或时间长 = 滑动，不是点击
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
@@ -912,11 +908,9 @@ async function autoLoadPrev() {
     console.error('auto load prev failed', e);
   } finally {
     loadingPrev.value = false;
-    // 延迟重置下拉状态，避免 touchend 竞争
-    setTimeout(() => {
-      pullState.value = 'idle';
-      pullOffset.value = 0;
-    }, 100);
+    // 加载完成后立即重置下拉状态
+    pullState.value = 'idle';
+    pullOffset.value = 0;
   }
 }
 

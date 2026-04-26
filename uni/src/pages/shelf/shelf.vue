@@ -99,8 +99,8 @@
               @touchend="onTouchEnd($event, rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
           <!-- 删除遮罩：左滑或长按触发 -->
-          <view v-if="swipedBookId === rec.bookId" class="delete-mask" @click.stop.prevent="removeSingle(rec.bookId)">
-            <view class="delete-mask-inner" @click.stop.prevent="removeSingle(rec.bookId)">
+          <view v-if="swipedBookId === rec.bookId" class="delete-mask" @touchstart.stop @touchend.stop.prevent="removeSingle(rec.bookId)">
+            <view class="delete-mask-inner" @touchstart.stop @touchend.stop.prevent="removeSingle(rec.bookId)">
               <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
