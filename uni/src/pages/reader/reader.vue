@@ -20,28 +20,20 @@
       @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <!-- 下拉加载指示器（仅在 pulling 状态显示，loading 时隐藏，由 loadingPrev 替代） -->
-      <view v-if="pullState === 'pulling'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
-        <view class="pull-spinner">
+      <!-- 下拉加载指示器 -->
+      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
+        <view class="pull-spinner" :class="{ 'pull-spinner-active': pullState === 'loading' }">
           <svg class="spinner" viewBox="0 0 50 50">
             <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
           </svg>
         </view>
       </view>
 
-      <!-- 上一章加载中 -->
-      <view v-if="loadingPrev" class="loading-spinner">
-        <svg class="spinner" viewBox="0 0 50 50">
-          <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
-        </svg>
-        <text>加载中</text>
-      </view>
-
       <view
-        v-for="section in sections"
+        v-for="(section, index) in sections"
         :key="section.chapterId"
         class="section-block"
-        :class="{ locked: section.locked }"
+        :class="{ locked: section.locked, 'section-divider': index > 0 }"
         :id="'ch-' + section.chapterId"
         @click="section.locked ? openUnlock(section.chapterId) : null"
       >
@@ -761,26 +753,23 @@ function onTouchMove(e: any) {
     return;
   }
 
-  // 如果正在加载中，忽略后续 touchmove
+  // 如果正在加载中，固定下拉高度，不响应新的拉动
   if (pullState.value === 'loading' || loadingPrev.value) {
+    pullOffset.value = 40;
     return;
   }
 
   const dy = e.touches[0].clientY - touchStartY;
   if (dy > 0) {
-    // 阻尼效果：越拉越难拉
-    const damped = Math.min(dy * 0.4, 120);
+    // 阻尼效果：越拉越难拉，最大距离限制为80px
+    const damped = Math.min(dy * 0.35, 80);
     pullOffset.value = damped;
 
     // 下拉超过阈值触发加载
-    if (pullOffset.value >= 60) {
+    if (pullOffset.value >= 50) {
       pullState.value = 'loading';
-      pullOffset.value = 50; // 固定高度，显示加载中
-      // 立即触发加载，加载完成后重置状态
-      autoLoadPrev().then(() => {
-        pullState.value = 'idle';
-        pullOffset.value = 0;
-      });
+      pullOffset.value = 40; // 固定高度，显示加载中
+      autoLoadPrev();
     } else {
       pullState.value = 'pulling';
     }
@@ -868,11 +857,23 @@ async function autoLoadNext() {
 
 async function autoLoadPrev() {
   const prevCh = getPrevChapter();
-  if (!prevCh) return;
+  if (!prevCh) {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+    return;
+  }
   // 严格防重入：已加载或正在加载都直接返回
-  if (sections.value.some(s => s.chapterId === prevCh.id)) return;
+  if (sections.value.some(s => s.chapterId === prevCh.id)) {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+    return;
+  }
   if (loadingPrev.value) return;
-  if (!prevCh.isFree && !isUnlocked(prevCh.id)) return;
+  if (!prevCh.isFree && !isUnlocked(prevCh.id)) {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+    return;
+  }
 
   loadingPrev.value = true;
   try {
@@ -904,6 +905,9 @@ async function autoLoadPrev() {
     console.error('auto load prev failed', e);
   } finally {
     loadingPrev.value = false;
+    // 加载完成后重置下拉状态
+    pullState.value = 'idle';
+    pullOffset.value = 0;
   }
 }
 
@@ -1269,6 +1273,11 @@ async function buyChapter() {
 }
 .section-block {
   padding: 40rpx 0;
+}
+.section-block.section-divider {
+  border-top: 1rpx solid rgba(163, 74, 46, 0.1);
+  margin-top: 20rpx;
+  padding-top: 60rpx;
 }
 .chapter-heading {
   font-size: 40rpx;
