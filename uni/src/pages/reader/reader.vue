@@ -766,11 +766,15 @@ function onTouchStart(e: any) {
   if (pullState.value === 'loading' && !loadingPrev.value) {
     resetPullState();
   }
+  console.log('[PULL] touchstart', { pullState: pullState.value, scrollTop: getScrollEl()?.scrollTop });
 }
 
 // 原生 touchmove 处理器（绑定 passive: false）
 function onNativeTouchMove(e: TouchEvent) {
-  if (pullState.value === 'loading') return;
+  if (pullState.value === 'loading') {
+    console.log('[PULL] touchmove blocked, state=loading');
+    return;
+  }
 
   const el = getScrollEl();
   if (!el) return;
@@ -786,6 +790,8 @@ function onNativeTouchMove(e: TouchEvent) {
   const touch = e.touches[0];
   const deltaY = touch.clientY - pullStartY;
   const deltaX = Math.abs(touch.clientX - pullStartX);
+
+  console.log('[PULL] touchmove', { deltaY, deltaX, scrollTop: el.scrollTop, pullState: pullState.value });
 
   // 向上滑动，重置
   if (deltaY <= 0) {
@@ -815,6 +821,8 @@ function onNativeTouchMove(e: TouchEvent) {
 
 // 原生 touchend 处理器
 function onNativeTouchEnd(e: TouchEvent) {
+  console.log('[PULL] touchend', { pullState: pullState.value, isPulling, pullOffset: pullOffset.value });
+
   // 如果正在加载中，忽略
   if (pullState.value === 'loading') return;
 
@@ -857,6 +865,7 @@ function resetPullState() {
   pullState.value = 'idle';
   pullOffset.value = 0;
   isPulling = false;
+  console.log('[PULL] reset to idle');
 }
 
 // 绑定/解绑原生事件
