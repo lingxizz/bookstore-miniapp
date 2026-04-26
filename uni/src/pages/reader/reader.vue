@@ -16,17 +16,16 @@
       id="reader-content"
       class="content-scroll"
       @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
       :style="scrollStyle"
     >
       <!-- 下拉加载指示器 -->
-      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
+      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="pullIndicatorStyle">
         <view class="pull-spinner" :class="{ 'pull-spinner-active': pullState === 'loading' }">
           <svg class="spinner" viewBox="0 0 50 50">
             <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
           </svg>
         </view>
+        <text class="pull-text">{{ pullState === 'loading' ? '加载中...' : '释放加载上一章' }}</text>
       </view>
 
       <view
@@ -338,6 +337,22 @@ const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
 const pullOffset = ref(0);
 const pullState = ref<'idle' | 'pulling' | 'loading'>('idle');
+
+// 下拉刷新专用状态（与 loadingPrev 分离）
+let isPulling = false;
+let pullStartY = 0;
+let pullStartX = 0;
+let isAtTop = false;
+
+// 下拉指示器样式
+const pullIndicatorStyle = computed(() => {
+  const height = Math.min(pullOffset.value, 80);
+  return {
+    height: height + 'px',
+    opacity: height > 0 ? Math.min(height / 40, 1) : 0,
+    transition: isPulling ? 'none' : 'all 0.3s ease',
+  };
+});
 
 // 目录相关
 const catalogDesc = ref(false);
@@ -715,13 +730,19 @@ function teardownObservers() {
 
 onMounted(() => {
   const el = getScrollEl();
-  if (el) el.addEventListener('scroll', onScrollHandler, { passive: true });
+  if (el) {
+    el.addEventListener('scroll', onScrollHandler, { passive: true });
+    bindPullEvents(el);
+  }
   setupObservers();
 });
 
 onUnmounted(() => {
   const el = getScrollEl();
-  if (el) el.removeEventListener('scroll', onScrollHandler);
+  if (el) {
+    el.removeEventListener('scroll', onScrollHandler);
+    unbindPullEvents(el);
+  }
   teardownObservers();
   if (saveProgressTimer) clearTimeout(saveProgressTimer);
   if (currentReadingChapterId > 0) {
@@ -738,62 +759,76 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
-  // 每次 touchstart 都重置，只有真正进入 loading 才由 autoLoadPrev 控制
-  if (pullState.value !== 'loading') {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
-  }
 }
 
-function onTouchMove(e: any) {
+// 原生 touchmove 处理器（绑定 passive: false）
+function onNativeTouchMove(e: TouchEvent) {
+  if (pullState.value === 'loading') return;
+
   const el = getScrollEl();
-  // 只有在 scrollTop <= 0 时才触发下拉
-  if (!el || el.scrollTop > 2) {
-    if (pullState.value !== 'loading') {
-      pullState.value = 'idle';
-      pullOffset.value = 0;
+  if (!el) return;
+
+  // 不在顶部，不处理下拉
+  if (el.scrollTop > 2) {
+    if (pullState.value !== 'idle') {
+      resetPullState();
     }
     return;
   }
 
-  // 如果正在加载中，忽略新的拉动
-  if (pullState.value === 'loading') {
+  const touch = e.touches[0];
+  const deltaY = touch.clientY - pullStartY;
+  const deltaX = Math.abs(touch.clientX - pullStartX);
+
+  // 向上滑动，重置
+  if (deltaY <= 0) {
+    if (pullState.value !== 'idle') resetPullState();
     return;
   }
 
-  const dy = e.touches[0].clientY - touchStartY;
-  if (dy > 0) {
-    // 阻尼效果：越拉越难拉，最大距离限制为80px
-    const damped = Math.min(dy * 0.35, 80);
-    pullOffset.value = damped;
+  // 横向滑动为主，不处理
+  if (deltaX > deltaY * 1.5) return;
 
-    // 下拉超过阈值触发加载
-    if (pullOffset.value >= 50 && pullState.value !== 'loading') {
-      pullState.value = 'loading';
-      pullOffset.value = 40; // 固定高度，显示加载中
-      autoLoadPrev();
-    } else {
-      pullState.value = 'pulling';
-    }
+  // 阻止默认行为（iOS 橡皮筋）
+  e.preventDefault();
+
+  isPulling = true;
+
+  // 阻尼计算：越拉越难拉
+  const damped = deltaY * 0.35;
+  pullOffset.value = Math.min(damped, 80);
+
+  // 超过阈值进入 release 状态
+  if (pullOffset.value >= 50) {
+    pullState.value = 'pulling'; // 保持 pulling，在 touchend 时触发 loading
   } else {
-    pullOffset.value = 0;
-    pullState.value = 'idle';
+    pullState.value = 'pulling';
   }
 }
 
-function onTouchEnd(e: any) {
+// 原生 touchend 处理器
+function onNativeTouchEnd(e: TouchEvent) {
+  // 如果正在加载中，忽略
+  if (pullState.value === 'loading') return;
+
+  const wasPulling = isPulling;
+  isPulling = false;
+
+  // 如果正在下拉且超过阈值，触发加载
+  if (wasPulling && pullOffset.value >= 50) {
+    pullState.value = 'loading';
+    pullOffset.value = 40;
+    autoLoadPrev();
+    return;
+  }
+
+  // 否则重置下拉状态
+  resetPullState();
+
+  // 点击区域识别（只在非下拉时处理）
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
-
-  // 如果正在加载中，忽略点击判断
-  if (pullState.value === 'loading') {
-    return;
-  }
-
-  // 非 loading 状态：重置下拉
-  pullState.value = 'idle';
-  pullOffset.value = 0;
 
   // 移动距离大或时间长 = 滑动，不是点击
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
@@ -809,6 +844,23 @@ function onTouchEnd(e: any) {
   } else {
     onTapCenter();
   }
+}
+
+function resetPullState() {
+  pullState.value = 'idle';
+  pullOffset.value = 0;
+  isPulling = false;
+}
+
+// 绑定/解绑原生事件
+function bindPullEvents(el: HTMLElement) {
+  el.addEventListener('touchmove', onNativeTouchMove, { passive: false });
+  el.addEventListener('touchend', onNativeTouchEnd, { passive: true });
+}
+
+function unbindPullEvents(el: HTMLElement) {
+  el.removeEventListener('touchmove', onNativeTouchMove);
+  el.removeEventListener('touchend', onNativeTouchEnd);
 }
 
 // 内容不够一页时自动预加载
@@ -861,20 +913,17 @@ async function autoLoadNext() {
 async function autoLoadPrev() {
   const prevCh = getPrevChapter();
   if (!prevCh) {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+    resetPullState();
     return;
   }
   // 严格防重入：已加载或正在加载都直接返回
   if (sections.value.some(s => s.chapterId === prevCh.id)) {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+    resetPullState();
     return;
   }
   if (loadingPrev.value) return;
   if (!prevCh.isFree && !isUnlocked(prevCh.id)) {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+    resetPullState();
     return;
   }
 
@@ -908,9 +957,8 @@ async function autoLoadPrev() {
     console.error('auto load prev failed', e);
   } finally {
     loadingPrev.value = false;
-    // 加载完成后立即重置下拉状态
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+    // 加载完成后重置下拉状态
+    resetPullState();
   }
 }
 
@@ -1273,7 +1321,10 @@ async function buyChapter() {
   -webkit-overflow-scrolling: touch;
   position: relative;
   z-index: 1;
+  overscroll-behavior-y: none;
+  touch-action: pan-y;
 }
+
 .section-block {
   padding: 40rpx 0;
 }
@@ -1576,11 +1627,19 @@ async function buyChapter() {
 /* 下拉加载指示器 */
 .pull-indicator {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   overflow: hidden;
-  transition: height 0.15s ease;
+  background: transparent;
 }
+
+.pull-text {
+  font-size: 24rpx;
+  color: #A34A2E;
+  margin-top: 8rpx;
+}
+
 .pull-spinner {
   display: flex;
   align-items: center;
@@ -1588,9 +1647,11 @@ async function buyChapter() {
   opacity: 0.6;
   transition: opacity 0.2s ease;
 }
+
 .pull-spinner-active {
   opacity: 1;
 }
+
 .pull-spinner .spinner {
   width: 32rpx;
   height: 32rpx;
