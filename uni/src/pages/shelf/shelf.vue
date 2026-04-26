@@ -79,7 +79,7 @@
         </view>
       </view>
 
-      <!-- Tabs + 管理按钮 -->
+      <!-- Tabs -->
       <view class="tabs-row">
         <view class="tabs">
           <view class="tab" v-for="t in tabList" :key="t.value"
@@ -87,17 +87,19 @@
             <text>{{ t.label }}</text>
           </view>
         </view>
-        <text class="manage-btn" @click="toggleManage">{{ isManaging ? '完成' : '管理' }}</text>
       </view>
 
       <!-- Book list -->
-      <view class="book-list" :class="{ 'managing': isManaging }">
+      <view class="book-list">
         <view class="book-row" v-for="rec in filteredRecords" :key="rec.id"
-              :class="{ 'managing-row': isManaging && shakingBookId === rec.bookId, 'other-row': isManaging && shakingBookId !== null && shakingBookId !== rec.bookId }"
-              @click="isManaging ? null : goDetail(rec.bookId)"
+              :class="{ 'swiped': swipedBookId === rec.bookId, 'removing': removingBookId === rec.bookId }"
+              @click="swipedBookId === rec.bookId ? null : goDetail(rec.bookId)"
+              @touchstart="onTouchStart($event, rec.bookId)"
+              @touchmove="onTouchMove($event, rec.bookId)"
+              @touchend="onTouchEnd($event, rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
-          <!-- 管理模式下仅长按书籍显示删除遮罩 -->
-          <view v-if="isManaging && shakingBookId === rec.bookId" class="delete-mask" @click="removeSingle(rec.bookId)">
+          <!-- 删除遮罩：左滑或长按触发 -->
+          <view v-if="swipedBookId === rec.bookId" class="delete-mask" @click.stop="removeSingle(rec.bookId)">
             <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -162,8 +164,8 @@ const records = ref<ExtendedShelfItem[]>([]);
 const isLoading = ref(true);
 const firstLoad = ref(true);
 const activeTab = ref('all');
-const isManaging = ref(false);
-const shakingBookId = ref<number | null>(null);
+const swipedBookId = ref<number | null>(null);
+const removingBookId = ref<number | null>(null);
 const tabList = [
   { label: '全部', value: 'all' },
   { label: '在读', value: 'reading' },
@@ -228,18 +230,52 @@ function goReader(item: ExtendedShelfItem) {
   uni.navigateTo({ url: `/pages/reader/reader?bookId=${item.bookId}&chapterId=${chapterId}` });
 }
 
-function toggleManage() {
-  isManaging.value = !isManaging.value;
-  if (!isManaging.value) {
-    shakingBookId.value = null;
+// 滑动删除相关
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+
+function onTouchStart(e: any, bookId: number) {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+}
+
+function onTouchMove(e: any, bookId: number) {
+  const dx = e.touches[0].clientX - touchStartX;
+  const dy = e.touches[0].clientY - touchStartY;
+
+  // 垂直滑动为主，不处理
+  if (Math.abs(dy) > Math.abs(dx)) return;
+
+  // 左滑超过阈值，显示删除遮罩
+  if (dx < -60) {
+    swipedBookId.value = bookId;
+  }
+  // 右滑关闭
+  if (dx > 40 && swipedBookId.value === bookId) {
+    swipedBookId.value = null;
+  }
+}
+
+function onTouchEnd(e: any, bookId: number) {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartTime;
+
+  // 点击事件（小移动、短时间）
+  if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 300) {
+    // 如果当前有打开的书籍，先关闭
+    if (swipedBookId.value !== null) {
+      swipedBookId.value = null;
+      return;
+    }
   }
 }
 
 function onLongPress(bookId: number) {
-  if (!isManaging.value) {
-    isManaging.value = true;
-    shakingBookId.value = bookId;
-  }
+  // 长按直接显示删除遮罩
+  swipedBookId.value = bookId;
 }
 
 async function removeSingle(bookId: number) {
@@ -253,12 +289,19 @@ async function removeSingle(bookId: number) {
           const { removeFromShelf } = await import('@/api/book');
           await removeFromShelf(bookId);
           uni.showToast({ title: '移除成功', icon: 'none' });
-          // 如果书架空了，退出管理模式
-          if (records.value.length <= 1) {
-            isManaging.value = false;
-            shakingBookId.value = null;
-          }
-          loadShelf();
+          swipedBookId.value = null;
+          // 标记为移除中，触发高度收缩动画
+          removingBookId.value = bookId;
+          // 等待动画完成后再从数据中移除
+          setTimeout(() => {
+            const idx = records.value.findIndex(r => r.bookId === bookId);
+            if (idx !== -1) {
+              records.value.splice(idx, 1);
+            }
+            removingBookId.value = null;
+            // 延迟重新加载确保数据同步
+            setTimeout(loadShelf, 200);
+          }, 350);
         } catch (e) {
           uni.showToast({ title: '移除失败', icon: 'none' });
         }
@@ -557,13 +600,6 @@ async function removeSingle(bookId: number) {
 .tab.active text {
   color: #FFFFFF;
 }
-.manage-btn {
-  font-size: 26rpx;
-  color: #A34A2E;
-  font-family: 'Noto Sans SC', sans-serif;
-  padding: 8rpx 16rpx;
-}
-
 /* Book list */
 .book-list {
   margin-bottom: 24rpx;
@@ -580,6 +616,8 @@ async function removeSingle(bookId: number) {
   border: 1rpx solid rgba(163, 74, 46, 0.06);
   position: relative;
   overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transform-origin: center;
 }
 
 /* 抖动动画 */
@@ -596,17 +634,23 @@ async function removeSingle(bookId: number) {
   90% { transform: translateX(-1rpx) rotate(0deg); }
 }
 
-/* 管理模式：仅长按的书籍内容左移 */
-.managing-row .book-cover,
-.managing-row .book-body {
+/* 左滑/长按：内容左移，露出删除遮罩 */
+.swiped .book-cover,
+.swiped .book-body {
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   transform: translateX(-80rpx);
 }
 
-/* 其他书不移 */
-.other-row .book-cover,
-.other-row .book-body {
-  transform: translateX(0);
+/* 移除动画：高度收缩 + 淡出 */
+.book-row.removing {
+  transform: scaleY(0);
+  opacity: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* 删除遮罩 */
@@ -622,7 +666,7 @@ async function removeSingle(bookId: number) {
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  z-index: 10;
+  z-index: 100;
   border-radius: 0 20rpx 20rpx 0;
   animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }

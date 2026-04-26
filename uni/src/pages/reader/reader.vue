@@ -738,8 +738,11 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
-  pullState.value = 'idle';
-  pullOffset.value = 0;
+  // 只在非 loading 状态重置，避免加载完成后状态被覆盖
+  if (pullState.value !== 'loading') {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+  }
 }
 
 function onTouchMove(e: any) {
@@ -765,12 +768,12 @@ function onTouchMove(e: any) {
     const damped = Math.min(dy * 0.35, 80);
     pullOffset.value = damped;
 
-    // 下拉超过阈值触发加载
-    if (pullOffset.value >= 50) {
+    // 下拉超过阈值触发加载（仅在非 loading 状态触发）
+    if (pullOffset.value >= 50 && pullState.value !== 'loading' && !loadingPrev.value) {
       pullState.value = 'loading';
       pullOffset.value = 40; // 固定高度，显示加载中
       autoLoadPrev();
-    } else {
+    } else if (pullState.value !== 'loading') {
       pullState.value = 'pulling';
     }
   } else {
