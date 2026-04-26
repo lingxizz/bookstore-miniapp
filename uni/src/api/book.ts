@@ -203,7 +203,7 @@ export function checkUnlock(bookId: number, chapterId: number): Promise<{ unlock
 
 // 金币余额
 export function fetchBalance(): Promise<{ balance: number }> {
-  return request('/api/user/balance', 'GET');
+  return request('/api/users/balance', 'GET');
 }
 
 // 充值

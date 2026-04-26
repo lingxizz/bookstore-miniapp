@@ -21,7 +21,14 @@ public class AuthService {
     public User findOrCreateUser(String openid, String nickname, String avatar) {
         Optional<User> existing = userRepository.findByOpenid(openid);
         if (existing.isPresent()) {
-            return existing.get();
+            User user = existing.get();
+            // 修复已有用户的空/默认昵称
+            if (user.getNickname() == null || user.getNickname().isEmpty() || "读者".equals(user.getNickname())) {
+                String defaultNickname = "读者" + (1000 + (int)(Math.random() * 9000));
+                user.setNickname(defaultNickname);
+                userRepository.save(user);
+            }
+            return user;
         }
         User user = new User();
         user.setOpenid(openid);
