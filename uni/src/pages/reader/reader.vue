@@ -9,7 +9,6 @@
     <!-- 顶部菜单栏（点击屏幕中央触发） -->
     <transition name="slide-down">
       <view class="reader-top" v-if="showMenu" @click.stop>
-        <view style="width: 60rpx" />
         <text class="shelf-btn" :class="{ 'in-shelf': isInShelf }" @click="toggleShelf">{{ isInShelf ? '已加书架' : '加入书架' }}</text>
       </view>
     </transition>
@@ -1041,13 +1040,16 @@ async function buyChapter() {
   right: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   padding: 50rpx 24rpx 20rpx;
   background: rgba(245, 240, 234, 0.98);
   backdrop-filter: blur(10px);
   z-index: 200;
   border-bottom: 1rpx solid rgba(0,0,0,0.05);
   transition: transform 0.3s ease;
+}
+.reader-top .shelf-btn {
+  margin-right: 80rpx;
 }
 .dark-mode .reader-top {
   background: rgba(26, 26, 46, 0.95);
