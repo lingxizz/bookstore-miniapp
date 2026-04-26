@@ -747,20 +747,33 @@ function onTouchStart(e: any) {
 
 function onTouchMove(e: any) {
   const el = getScrollEl();
-  if (!el || el.scrollTop > 0) {
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+  // 只有在 scrollTop <= 0 时才触发下拉
+  if (!el || el.scrollTop > 2) {
+    if (pullState.value !== 'loading') {
+      pullState.value = 'idle';
+      pullOffset.value = 0;
+    }
     return;
   }
+
+  // 如果正在加载中，固定下拉高度
+  if (pullState.value === 'loading') {
+    pullOffset.value = 50;
+    return;
+  }
+
   const dy = e.touches[0].clientY - touchStartY;
   if (dy > 0) {
-    pullOffset.value = Math.min(dy * 0.4, 120);
-    // 下拉超过阈值直接触发加载，不需要松手
-    if (pullState.value !== 'loading' && pullOffset.value >= 60) {
+    // 阻尼效果：越拉越难拉
+    const damped = Math.min(dy * 0.4, 120);
+    pullOffset.value = damped;
+
+    // 下拉超过阈值触发加载
+    if (pullOffset.value >= 60) {
       pullState.value = 'loading';
       pullOffset.value = 50; // 固定高度，显示加载中
       autoLoadPrev();
-    } else if (pullState.value !== 'loading') {
+    } else {
       pullState.value = 'pulling';
     }
   } else {
@@ -860,14 +873,20 @@ async function autoLoadPrev() {
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     };
 
+    // 记录当前滚动位置和内容高度（用于无感加载）
+    const el = getScrollEl();
+    const oldScrollTop = el?.scrollTop || 0;
+    const oldScrollHeight = el?.scrollHeight || 0;
+
     sections.value.unshift(newSection);
 
     await nextTick();
-    // prepend 后，原来的第一个 section 变成了第二个，滚动到它的新 offsetTop 即可保持文字位置不变
-    const el = getScrollEl();
-    const sectionEls = el?.querySelectorAll('.section-block');
-    if (el && sectionEls && sectionEls.length > 1) {
-      el.scrollTop = (sectionEls[1] as HTMLElement).offsetTop;
+    // 无感加载：prepend 后，通过计算新增内容的高度差来恢复 scrollTop
+    // 这样用户看到的文字位置不会发生变化
+    if (el) {
+      const newScrollHeight = el.scrollHeight;
+      const heightAdded = newScrollHeight - oldScrollHeight;
+      el.scrollTop = oldScrollTop + heightAdded;
     }
 
     // 加载上一章时不修改 chapterId，用户当前仍在阅读原来的章节
@@ -1756,17 +1775,18 @@ async function buyChapter() {
 /* 按钮组 */
 .btn-group {
   display: flex;
-  gap: 12rpx;
+  gap: 16rpx;
   flex-wrap: wrap;
 }
 .group-btn {
-  padding: 12rpx 28rpx;
+  padding: 14rpx 32rpx;
   border-radius: 48rpx;
   background: #FFFFFF;
   border: 1rpx solid #E8E2D8;
   font-size: 26rpx;
   color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
+  line-height: 1.4;
 }
 .dark-mode .group-btn {
   background: rgba(255,255,255,0.08);
