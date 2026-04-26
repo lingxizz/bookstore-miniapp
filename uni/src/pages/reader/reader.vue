@@ -1011,26 +1011,26 @@ async function buyChapter() {
   z-index: 100;
   display: flex;
   align-items: center;
+  justify-content: center;
   padding: 50rpx 24rpx 20rpx;
   background: v-bind(panelBg);
   pointer-events: none;
 }
 .reader-info .back-btn {
+  position: absolute;
+  left: 24rpx;
   pointer-events: auto;
   font-size: 36rpx;
   color: v-bind(textColor);
   padding: 8rpx;
-  min-width: 60rpx;
 }
 .reader-info .chapter-title {
-  flex: 1;
-  text-align: center;
   font-size: 26rpx;
   color: v-bind(textColor);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0 24rpx;
+  max-width: 60%;
 }
 
 /* 顶部栏 */
@@ -1074,7 +1074,7 @@ async function buyChapter() {
 /* 内容区 */
 .content-scroll {
   height: 100vh;
-  padding: 0 40rpx;
+  padding: 120rpx 40rpx 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   position: relative;
