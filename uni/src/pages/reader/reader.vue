@@ -297,6 +297,7 @@ import { adComplete } from '@/api/ad';
 const bookId = ref(0);
 const chapterId = ref(0);
 const bookWordCount = ref(0);
+const bookTitle = ref('');
 const chapters = ref<Chapter[]>([]);
 const sections = ref<Array<{ chapterId: number; title: string; paragraphs: string[]; locked?: boolean }>>([]);
 const isLoading = ref(false);
@@ -393,7 +394,7 @@ const paragraphWrapStyle = computed(() => ({
 
 const currentTitle = computed(() => {
   const ch = chapters.value.find(c => c.id === chapterId.value);
-  return ch?.title || '';
+  return ch?.title || bookTitle.value || '加载中...';
 });
 
 const chapterPrice = computed(() => {
@@ -428,6 +429,7 @@ onLoad(async (opts: any) => {
   try {
     const book = await fetchBook(bookId.value);
     bookWordCount.value = book?.wordCount || 0;
+    bookTitle.value = book?.title || '';
   } catch {}
   checkShelfStatus();
   await loadChapters();
@@ -1040,16 +1042,13 @@ async function buyChapter() {
   right: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   padding: 50rpx 24rpx 20rpx;
   background: rgba(245, 240, 234, 0.98);
   backdrop-filter: blur(10px);
   z-index: 200;
   border-bottom: 1rpx solid rgba(0,0,0,0.05);
   transition: transform 0.3s ease;
-}
-.reader-top .shelf-btn {
-  margin-right: 80rpx;
 }
 .dark-mode .reader-top {
   background: rgba(26, 26, 46, 0.95);
