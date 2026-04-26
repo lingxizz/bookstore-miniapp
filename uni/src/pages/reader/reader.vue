@@ -787,13 +787,17 @@ function onTouchEnd(e: any) {
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
 
-  // 如果正在加载中，忽略点击判断
-  if (pullState.value === 'loading') {
+  // 如果正在加载中，忽略点击判断，但 touchend 时不再强制重置状态
+  // 让 autoLoadPrev 的 finally 来重置
+  if (pullState.value === 'loading' || loadingPrev.value) {
     return;
   }
 
-  pullState.value = 'idle';
-  pullOffset.value = 0;
+  // 只有在非 loading 状态才重置
+  if (pullState.value !== 'loading') {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+  }
 
   // 移动距离大或时间长 = 滑动，不是点击
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
@@ -908,9 +912,11 @@ async function autoLoadPrev() {
     console.error('auto load prev failed', e);
   } finally {
     loadingPrev.value = false;
-    // 加载完成后重置下拉状态
-    pullState.value = 'idle';
-    pullOffset.value = 0;
+    // 延迟重置下拉状态，避免 touchend 竞争
+    setTimeout(() => {
+      pullState.value = 'idle';
+      pullOffset.value = 0;
+    }, 100);
   }
 }
 

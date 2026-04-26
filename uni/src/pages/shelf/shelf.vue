@@ -99,14 +99,16 @@
               @touchend="onTouchEnd($event, rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
           <!-- 删除遮罩：左滑或长按触发 -->
-          <view v-if="swipedBookId === rec.bookId" class="delete-mask" @click.stop="removeSingle(rec.bookId)">
-            <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-              <line x1="10" y1="11" x2="10" y2="17"/>
-              <line x1="14" y1="11" x2="14" y2="17"/>
-            </svg>
-            <text class="delete-text">移除</text>
+          <view v-if="swipedBookId === rec.bookId" class="delete-mask" @click.stop.prevent="removeSingle(rec.bookId)">
+            <view class="delete-mask-inner" @click.stop.prevent="removeSingle(rec.bookId)">
+              <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+              <text class="delete-text">移除</text>
+            </view>
           </view>
           <view class="book-cover" :style="{ backgroundColor: rec.coverColor || '#A34A2E' }">
             <image v-if="rec.cover" class="book-cover-img" :src="rec.cover" mode="aspectFill" />
@@ -669,6 +671,18 @@ async function removeSingle(bookId: number) {
   z-index: 100;
   border-radius: 0 20rpx 20rpx 0;
   animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* 遮罩内层：阻止事件穿透 */
+.delete-mask-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  pointer-events: auto;
 }
 
 /* 从右到左滑入 */
