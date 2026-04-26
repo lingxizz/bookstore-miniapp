@@ -178,12 +178,12 @@ export function removeFromShelf(bookId: number) {
 
 // 阅读进度
 export function fetchProgress(bookId: number) {
-  return request(`/api/progress/${bookId}`, 'GET');
+  return request(`/api/books/${bookId}/progress`, 'GET');
 }
 
 // 保存进度
 export function saveProgress(bookId: number, chapterId: number, progress: number) {
-  return request('/api/progress', 'POST', { bookId, chapterId, progress });
+  return request(`/api/books/${bookId}/progress`, 'POST', { chapterId, progress });
 }
 
 // 广告解锁
@@ -193,7 +193,7 @@ export function unlockByAd(bookId: number, chapterId: number, adToken: string) {
 
 // H5 登录
 export function h5Login(nickname?: string): Promise<{ token: string; user: any }> {
-  return request('/api/auth/login', 'POST', { code: 'h5_login', nickname: nickname || '读者', avatar: '' });
+  return request('/api/auth/login', 'POST', { code: 'h5_login', nickname: nickname ?? '', avatar: '' });
 }
 
 // 检查解锁状态
