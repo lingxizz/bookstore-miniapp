@@ -91,17 +91,45 @@
     </view>
 
     <!-- 目录弹窗 -->
-    <view class="catalog-mask" v-if="showCatalog" @click="showCatalog = false">
-      <view class="catalog-panel" @click.stop :style="{ backgroundColor: panelBg }">
+    <view class="catalog-mask" :class="{ 'mask-hidden': !showCatalog, 'mask-visible': showCatalog }" @click="showCatalog = false">
+      <view class="catalog-sheet" @click.stop :class="{ 'dark-mode': isDark }">
+        <!-- 拖拽指示条 -->
+        <view class="sheet-drag-handle" />
+
+        <!-- 头部：标题 + 排序切换 + 关闭 -->
         <view class="catalog-header">
-          <text class="catalog-title">章节目录</text>
-          <text class="catalog-close" @click="showCatalog = false">✕</text>
+          <view class="catalog-header-left">
+            <text class="catalog-title">章节目录</text>
+            <text class="catalog-count">共 {{ chapters.length }} 章</text>
+          </view>
+          <view class="catalog-header-right">
+            <view class="catalog-sort-btn" @click="toggleCatalogSort">
+              <text class="sort-icon">{{ catalogDesc ? '↓' : '↑' }}</text>
+              <text class="sort-label">{{ catalogDesc ? '倒序' : '正序' }}</text>
+            </view>
+            <text class="catalog-close" @click="showCatalog = false">✕</text>
+          </view>
         </view>
+
+        <!-- 分页标签 -->
+        <scroll-view v-if="catalogPages.length > 1" class="catalog-page-tabs" scroll-x show-scrollbar="false">
+          <view
+            v-for="(page, idx) in catalogPages"
+            :key="idx"
+            class="catalog-page-tab"
+            :class="{ active: currentCatalogPage === idx }"
+            @click="currentCatalogPage = idx"
+          >
+            <text>{{ page.label }}</text>
+          </view>
+        </scroll-view>
+
+        <!-- 章节列表 -->
         <scroll-view class="catalog-list" scroll-y>
           <view
-            class="catalog-item"
-            v-for="ch in chapters"
+            v-for="ch in displayedCatalogChapters"
             :key="ch.id"
+            class="catalog-item"
             :class="{ active: ch.id === chapterId, locked: !ch.isFree && !isUnlocked(ch.id) }"
             @click="selectChapter(ch)"
           >
@@ -310,6 +338,11 @@ const unlockedChapters = ref<number[]>([]);
 const pullOffset = ref(0);
 const pullState = ref<'idle' | 'pulling' | 'will-load'>('idle');
 
+// 目录相关
+const catalogDesc = ref(false);
+const currentCatalogPage = ref(0);
+const CATALOG_PAGE_SIZE = 50;
+
 // IntersectionObserver
 let bottomObserver: IntersectionObserver | null = null;
 let topObserver: IntersectionObserver | null = null;
@@ -426,6 +459,39 @@ const themeOptions = [
   { key: 'green', label: '护眼', bg: '#E8F5E9', text: '#2C2C2C' },
   { key: 'dark', label: '夜间', bg: '#1A1A2E', text: '#CCCCCC' },
 ];
+
+// 目录分页计算
+const catalogPages = computed(() => {
+  const total = chapters.value.length;
+  if (total <= CATALOG_PAGE_SIZE) return [];
+  const pages = [];
+  for (let i = 0; i < total; i += CATALOG_PAGE_SIZE) {
+    const start = i + 1;
+    const end = Math.min(i + CATALOG_PAGE_SIZE, total);
+    pages.push({ label: `${start}-${end}章`, start: i, end });
+  }
+  return pages;
+});
+
+// 目录显示的章节（排序+分页后）
+const displayedCatalogChapters = computed(() => {
+  let list = [...chapters.value];
+  if (catalogDesc.value) {
+    list = list.reverse();
+  }
+  if (catalogPages.value.length > 0) {
+    const page = catalogPages.value[currentCatalogPage.value];
+    if (page) {
+      list = list.slice(page.start, page.end);
+    }
+  }
+  return list;
+});
+
+function toggleCatalogSort() {
+  catalogDesc.value = !catalogDesc.value;
+  currentCatalogPage.value = 0;
+}
 
 onLoad(async (opts: any) => {
   bookId.value = parseInt(opts?.bookId || '1');
@@ -1259,26 +1325,67 @@ async function buyChapter() {
   bottom: 0;
   background: rgba(0,0,0,0.5);
   z-index: 100;
-}
-.catalog-panel {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 80%;
-  background: #FFFFFF;
   display: flex;
   flex-direction: column;
+  justify-content: flex-end;
+  transition: opacity 0.3s ease;
 }
-.dark-mode .catalog-panel {
+.catalog-mask.mask-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.catalog-mask.mask-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.catalog-sheet {
+  background: #FFFFFF;
+  border-radius: 24rpx 24rpx 0 0;
+  max-height: 80vh;
+  min-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16rpx 0 32rpx;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  width: 100%;
+}
+.catalog-mask.mask-hidden .catalog-sheet {
+  transform: translateY(100%);
+}
+.catalog-mask.mask-visible .catalog-sheet {
+  transform: translateY(0);
+}
+.dark-mode .catalog-sheet {
   background: #1A1A2E;
+}
+/* 羊皮纸主题 */
+.theme-light .catalog-sheet {
+  background: #F5F0EA;
+}
+/* 纯白主题 */
+.theme-white .catalog-sheet {
+  background: #FFFFFF;
+}
+/* 护眼主题 */
+.theme-green .catalog-sheet {
+  background: #E8F5E9;
 }
 .catalog-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24rpx 32rpx;
-  border-bottom: 1rpx solid #E8E2D8;
+  padding: 16rpx 32rpx 20rpx;
+  border-bottom: 1rpx solid rgba(0,0,0,0.06);
+}
+.catalog-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+}
+.catalog-header-right {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
 }
 .catalog-title {
   font-size: 32rpx;
@@ -1286,24 +1393,87 @@ async function buyChapter() {
   color: #2C2C2C;
   font-family: 'Noto Serif SC', serif;
 }
+.dark-mode .catalog-title {
+  color: #EEEEEE;
+}
+.catalog-count {
+  font-size: 24rpx;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .catalog-count {
+  color: #AAAAAA;
+}
+.catalog-sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 24rpx;
+  background: rgba(163, 74, 46, 0.08);
+}
+.dark-mode .catalog-sort-btn {
+  background: rgba(255,255,255,0.08);
+}
+.sort-icon {
+  font-size: 22rpx;
+  color: #A34A2E;
+}
+.sort-label {
+  font-size: 22rpx;
+  color: #645D55;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .sort-label {
+  color: #AAAAAA;
+}
 .catalog-close {
   font-size: 32rpx;
   color: #888888;
   padding: 8rpx;
 }
+
+/* 分页标签 */
+.catalog-page-tabs {
+  white-space: nowrap;
+  padding: 16rpx 24rpx 8rpx;
+  border-bottom: 1rpx solid rgba(0,0,0,0.04);
+}
+.catalog-page-tab {
+  display: inline-flex;
+  padding: 10rpx 24rpx;
+  border-radius: 24rpx;
+  margin-right: 12rpx;
+  background: rgba(0,0,0,0.04);
+}
+.catalog-page-tab text {
+  font-size: 24rpx;
+  color: #666666;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .catalog-page-tab text {
+  color: #AAAAAA;
+}
+.catalog-page-tab.active {
+  background: #A34A2E;
+}
+.catalog-page-tab.active text {
+  color: #FFFFFF;
+}
+
 .catalog-list {
   flex: 1;
-  padding: 16rpx 0;
+  padding: 8rpx 0;
 }
 .catalog-item {
   display: flex;
   align-items: center;
   gap: 16rpx;
-  padding: 20rpx 32rpx;
-  border-bottom: 1rpx solid #F5F0EA;
+  padding: 24rpx 32rpx;
+  border-bottom: 1rpx solid rgba(0,0,0,0.04);
 }
 .catalog-item.active {
-  background: rgba(163, 74, 46, 0.1);
+  background: rgba(163, 74, 46, 0.08);
 }
 .catalog-item.locked {
   opacity: 0.5;
@@ -1311,17 +1481,26 @@ async function buyChapter() {
 .catalog-num {
   font-size: 24rpx;
   color: #888888;
-  width: 48rpx;
+  width: 56rpx;
   font-family: 'Noto Serif SC', serif;
+  text-align: center;
+  flex-shrink: 0;
 }
 .catalog-name {
   flex: 1;
   font-size: 28rpx;
   color: #2C2C2C;
   font-family: 'Noto Sans SC', sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dark-mode .catalog-name {
+  color: #CCCCCC;
 }
 .catalog-lock {
   font-size: 24rpx;
+  flex-shrink: 0;
 }
 
 /* 点击区域 - 不拦截滚动 */
