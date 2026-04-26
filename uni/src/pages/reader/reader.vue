@@ -589,6 +589,7 @@ async function loadCurrentChapter() {
       title: data?.title || ch.title,
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     }];
+    earliestLoadedChapterId = ch.id; // 初始化最前面章节
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, calculateBookProgress(chapterId.value, 0)).catch(() => {});
@@ -635,7 +636,9 @@ function getNextChapter() {
 }
 
 function getPrevChapter() {
-  const idx = chapters.value.findIndex(c => c.id === chapterId.value);
+  // 使用已加载的最前面章节来找上一章
+  const refId = earliestLoadedChapterId || chapterId.value;
+  const idx = chapters.value.findIndex(c => c.id === refId);
   return idx > 0 ? chapters.value[idx - 1] : null;
 }
 
@@ -648,6 +651,7 @@ function getScrollEl() {
 let saveProgressTimer: ReturnType<typeof setTimeout> | null = null;
 let currentReadingChapterId = 0;
 let currentReadingProgress = 0;
+let earliestLoadedChapterId = 0; // 已加载的最前面章节
 
 function onScrollHandler() {
   const el = getScrollEl();
@@ -816,17 +820,14 @@ async function autoLoadNext() {
 async function autoLoadPrev() {
   const prevCh = getPrevChapter();
   if (!prevCh) {
-    resetPullState();
     return;
   }
   // 严格防重入：已加载或正在加载都直接返回
   if (sections.value.some(s => s.chapterId === prevCh.id)) {
-    resetPullState();
     return;
   }
   if (loadingPrev.value) return;
   if (!prevCh.isFree && !isUnlocked(prevCh.id)) {
-    resetPullState();
     return;
   }
 
@@ -845,6 +846,8 @@ async function autoLoadPrev() {
     const oldScrollHeight = el?.scrollHeight || 0;
 
     sections.value.unshift(newSection);
+    // 更新已加载的最前面章节
+    earliestLoadedChapterId = prevCh.id;
 
     await nextTick();
     // 无感加载：prepend 后，通过计算新增内容的高度差来恢复 scrollTop
@@ -861,7 +864,8 @@ async function autoLoadPrev() {
   } finally {
     loadingPrev.value = false;
     // 加载完成后重置下拉状态
-    resetPullState();
+    pullState.value = 'idle';
+    pullOffset.value = 0;
   }
 }
 
