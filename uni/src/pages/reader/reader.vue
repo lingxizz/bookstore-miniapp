@@ -294,6 +294,8 @@ const unlockedChapters = ref<number[]>([]);
 let bottomObserver: IntersectionObserver | null = null;
 let topObserver: IntersectionObserver | null = null;
 let scrollEl: HTMLElement | null = null;
+let lastScrollTop = 0;
+let hasUserScrolledUp = false;
 
 // 阅读配置
 const config = ref({
@@ -460,6 +462,9 @@ async function loadCurrentChapter() {
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
+    // 重置向上滚动标志，防止刚进入就自动加载上一章
+    hasUserScrolledUp = false;
+    lastScrollTop = 0;
     await nextTick();
     setupObservers();
     await checkAndLoadMore();
@@ -493,7 +498,12 @@ function getScrollEl() {
 function onScrollHandler() {
   const el = getScrollEl();
   if (!el) return;
-  currentScrollTop.value = el.scrollTop;
+  const st = el.scrollTop;
+  if (st < lastScrollTop) {
+    hasUserScrolledUp = true;
+  }
+  lastScrollTop = st;
+  currentScrollTop.value = st;
 }
 
 // IntersectionObserver 设置
@@ -617,6 +627,7 @@ async function autoLoadNext() {
 }
 
 async function autoLoadPrev() {
+  if (!hasUserScrolledUp) return;
   const prevCh = getPrevChapter();
   if (!prevCh) return;
   if (sections.value.some(s => s.chapterId === prevCh.id)) return;
