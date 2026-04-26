@@ -290,7 +290,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
-import { fetchBook, fetchChapters, fetchChapterContent, saveProgress, checkUnlock, unlockByAd, buyChapter as apiBuyChapter, type Chapter } from '@/api/book';
+import { fetchBook, fetchChapters, fetchChapterContent, saveProgress, checkUnlock, unlockByAd, buyChapter as apiBuyChapter, checkShelf, addToShelf, removeFromShelf, type Chapter } from '@/api/book';
 import { fetchReaderConfig, saveReaderConfig } from '@/api/user';
 import { adComplete } from '@/api/ad';
 
@@ -880,24 +880,62 @@ function goBack() {
   uni.navigateBack();
 }
 
-function toggleShelf() {
-  const shelfKey = 'shelf_books';
-  const shelf = uni.getStorageSync(shelfKey) || [];
-  const idx = shelf.findIndex((b: any) => b.id === bookId.value);
-  if (idx >= 0) {
-    shelf.splice(idx, 1);
-    isInShelf.value = false;
-  } else {
-    const book = { id: bookId.value, title: currentTitle.value || '未知书籍', addedAt: Date.now() };
-    shelf.unshift(book);
-    isInShelf.value = true;
+const shelfLoading = ref(false);
+
+async function toggleShelf() {
+  if (shelfLoading.value) return;
+  const token = uni.getStorageSync('token');
+  if (!token) {
+    uni.showModal({
+      title: '需要登录',
+      content: '登录后即可管理书架',
+      showCancel: true,
+      success: (res: any) => {
+        if (res.confirm) uni.switchTab({ url: '/pages/me/me' });
+      }
+    });
+    return;
   }
-  uni.setStorageSync(shelfKey, shelf);
+  shelfLoading.value = true;
+  try {
+    if (isInShelf.value) {
+      await removeFromShelf(bookId.value);
+      isInShelf.value = false;
+      uni.showToast({ title: '已移除书架', icon: 'none' });
+    } else {
+      await addToShelf(bookId.value);
+      isInShelf.value = true;
+      uni.showToast({ title: '已加入书架', icon: 'none' });
+    }
+  } catch (e: any) {
+    const msg = String(e?.message || e || '');
+    if (msg.includes('Unauthorized') || msg.includes('Forbidden') || msg.includes('401') || msg.includes('403')) {
+      uni.showModal({
+        title: '登录已过期',
+        content: '请重新登录',
+        showCancel: false,
+        success: () => uni.switchTab({ url: '/pages/me/me' })
+      });
+      return;
+    }
+    uni.showToast({ title: '操作失败: ' + msg, icon: 'none' });
+  } finally {
+    shelfLoading.value = false;
+  }
 }
 
-function checkShelfStatus() {
-  const shelf = uni.getStorageSync('shelf_books') || [];
-  isInShelf.value = shelf.some((b: any) => b.id === bookId.value);
+async function checkShelfStatus() {
+  const token = uni.getStorageSync('token');
+  if (!token) {
+    isInShelf.value = false;
+    return;
+  }
+  try {
+    const res = await checkShelf(bookId.value);
+    isInShelf.value = res?.inShelf || false;
+  } catch {
+    isInShelf.value = false;
+  }
 }
 
 async function selectChapter(ch: Chapter) {
