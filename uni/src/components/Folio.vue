@@ -1,15 +1,13 @@
 <template>
-  <view class="folio">
-    <text class="dash">—</text>
-    <text class="num">{{ fmtNum }}</text>
-    <text class="dash">—</text>
+  <view class="folio" :style="{ paddingTop: pad + 'rpx', paddingBottom: pad + 'rpx' }">
+    <view class="folio-line" />
+    <text class="folio-num">— {{ num }} —</text>
+    <view class="folio-line" />
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-const props = defineProps<{ num: number }>();
-const fmtNum = computed(() => String(props.num).padStart(3, '0'));
+defineProps<{ num: number; pad?: number }>();
 </script>
 
 <style scoped>
@@ -18,17 +16,17 @@ const fmtNum = computed(() => String(props.num).padStart(3, '0'));
   align-items: center;
   justify-content: center;
   gap: 16rpx;
-  padding: 48rpx 0 120rpx;
+  margin: 32rpx 0;
 }
-.dash {
-  color: #E8E2D8;
-  font-size: 24rpx;
-  letter-spacing: 4rpx;
+.folio-line {
+  flex: 1;
+  height: 1rpx;
+  background: #E8E2D8;
 }
-.num {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 24rpx;
+.folio-num {
+  font-size: 22rpx;
   color: #AAAAAA;
-  letter-spacing: 4rpx;
+  font-family: 'Noto Serif SC', serif;
+  white-space: nowrap;
 }
 </style>

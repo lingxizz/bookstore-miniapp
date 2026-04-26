@@ -1,57 +1,52 @@
 <template>
-  <view class="chapter-item" @click="$emit('click')">
-    <view class="left">
-      <text class="num">{{ num }}</text>
-      <text class="title">{{ title }}</text>
-    </view>
-    <view class="right">
-      <text v-if="isPremium" class="lock">锁</text>
-      <text v-else class="free">免费</text>
-    </view>
+  <view class="chapter-item" :class="{ premium: isPremium }" @click="$emit('click')">
+    <text class="chapter-num">{{ String(num).padStart(2, '0') }}</text>
+    <text class="chapter-title">{{ title }}</text>
+    <text class="chapter-lock" v-if="isPremium">🔒</text>
   </view>
 </template>
 
 <script setup lang="ts">
-defineProps<{ num: number; title: string; isPremium: boolean }>();
-defineEmits<{ (e: 'click'): void }>();
+defineProps<{
+  num: number;
+  title: string;
+  isPremium?: boolean;
+}>();
+defineEmits(['click']);
 </script>
 
 <style scoped>
 .chapter-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #E8E2D8;
-}
-.left {
-  display: flex;
   align-items: center;
   gap: 16rpx;
-  flex: 1;
-  overflow: hidden;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #F5F0EA;
 }
-.num {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 22rpx;
+.chapter-item:last-child {
+  border-bottom: none;
+}
+.chapter-num {
+  font-size: 24rpx;
   color: #AAAAAA;
-  min-width: 48rpx;
+  font-family: 'Noto Serif SC', serif;
+  width: 48rpx;
+  flex-shrink: 0;
 }
-.title {
+.chapter-title {
+  flex: 1;
   font-size: 28rpx;
   color: #2C2C2C;
-  flex: 1;
+  font-family: 'Noto Sans SC', sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lock {
-  font-size: 24rpx;
-  color: #E8A23E;
-  font-weight: 600;
+.chapter-item.premium .chapter-title {
+  color: #888888;
 }
-.free {
+.chapter-lock {
   font-size: 24rpx;
-  color: #4CAF50;
+  flex-shrink: 0;
 }
 </style>

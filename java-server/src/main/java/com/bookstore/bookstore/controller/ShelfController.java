@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -37,19 +38,17 @@ public class ShelfController {
 
     @GetMapping("/books/{id}/shelf")
     public ResponseEntity<?> checkShelf(@PathVariable Integer id, Authentication authentication) {
-        Integer userId = null;
         if (authentication instanceof JwtAuthentication jwtAuth) {
-            userId = jwtAuth.getUserId();
+            return ResponseEntity.ok(Map.of("inShelf", shelfService.isInShelf(jwtAuth.getUserId(), id)));
         }
-        if (userId == null) {
-            return ResponseEntity.ok(Map.of("inShelf", false));
-        }
-        return ResponseEntity.ok(Map.of("inShelf", shelfService.isInShelf(userId, id)));
+        return ResponseEntity.ok(Map.of("inShelf", false));
     }
 
     @GetMapping("/shelf")
     public List<BookShelf> getShelf(Authentication authentication) {
-        Integer userId = ((JwtAuthentication) authentication).getUserId();
-        return shelfService.getShelf(userId);
+        if (authentication instanceof JwtAuthentication jwtAuth) {
+            return shelfService.getShelf(jwtAuth.getUserId());
+        }
+        return Collections.emptyList();
     }
 }

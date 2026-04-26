@@ -28,6 +28,13 @@ public class BookController {
         return bookService.listBooks(category, q);
     }
 
+    @GetMapping("/filter")
+    public List<Book> filterBooks(@RequestParam(required = false) String category,
+                                  @RequestParam(required = false) String status,
+                                  @RequestParam(required = false) String sort) {
+        return bookService.listBooksFiltered(category, status, sort);
+    }
+
     @GetMapping("/{id}")
     public Book getBook(@PathVariable Integer id) {
         return bookService.getBook(id).orElse(null);

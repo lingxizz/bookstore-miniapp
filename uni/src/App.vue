@@ -1,96 +1,110 @@
-<template>
-  <view class="app-wrap">
-    <!-- H5 自定义 TabBar -->
-    <view class="h5-tabbar" v-if="isH5 && showTabBar">
-      <view
-        v-for="item in tabList"
-        :key="item.pagePath"
-        class="tab-item"
-        :class="{ active: selected === item.pagePath }"
-        @click="switchTab(item)"
-      >
-        <text class="tab-icon">{{ item.icon }}</text>
-        <text class="tab-text">{{ item.text }}</text>
-      </view>
-    </view>
-  </view>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { onLaunch, onShow, onHide } from '@dcloudio/uni-app';
 
 onLaunch(() => {
-  console.log("App Launch");
+  console.log('App Launch');
+  // H5 隐藏原生 tabbar，使用自定义
+  // #ifdef H5
+  uni.hideTabBar();
+  // #endif
 });
+
 onShow(() => {
-  console.log("App Show");
+  console.log('App Show');
 });
+
 onHide(() => {
-  console.log("App Hide");
+  console.log('App Hide');
 });
-
-// H5 TabBar
-const isH5 = computed(() => {
-  // @ts-ignore
-  return typeof window !== 'undefined' && uni.getSystemInfoSync().platform === 'web';
-});
-
-const tabList = [
-  { pagePath: 'pages/index/index', text: '\u53d1\u73b0', icon: '\u2726' },
-  { pagePath: 'pages/store/store', text: '\u4e66\u57ce', icon: '\u25c8' },
-  { pagePath: 'pages/shelf/shelf', text: '\u4e66\u67b6', icon: '\u25a4' },
-  { pagePath: 'pages/me/me', text: '\u6211\u7684', icon: '\u25c9' },
-];
-
-const tabPages = tabList.map(i => i.pagePath);
-const selected = ref('');
-
-const updateRoute = () => {
-  const pages = getCurrentPages();
-  const route = pages[pages.length - 1]?.route || '';
-  selected.value = route;
-};
-
-let timer: any;
-
-onMounted(() => {
-  if (isH5.value) {
-    updateRoute();
-    timer = setInterval(updateRoute, 200);
-  }
-});
-
-onUnmounted(() => {
-  clearInterval(timer);
-});
-
-const showTabBar = computed(() => tabPages.includes(selected.value));
-
-const switchTab = (item: typeof tabList[0]) => {
-  uni.switchTab({ url: '/' + item.pagePath });
-};
 </script>
 
 <style>
 /* 全局基础样式 */
 page {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, sans-serif;
-  background-color: #F5F0EA;
-  color: #2C2C2C;
-  box-sizing: border-box;
+  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #F8F4F0;
+  color: #1C1C19;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
-view, text, input, scroll-view {
-  box-sizing: border-box;
+
+/* 全局字体 */
+@font-face {
+  font-family: 'Noto Serif SC';
+  src: local('Noto Serif SC'), local('Songti SC'), local('STSong');
 }
-/* 文本溢出工具类 */
-.text-ellipsis {
+
+@font-face {
+  font-family: 'Noto Sans SC';
+  src: local('Noto Sans SC'), local('PingFang SC'), local('Helvetica Neue');
+}
+
+/* 安全区域适配 */
+.safe-area-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 强制隐藏原生 TabBar（H5 端） */
+uni-tabbar,
+.uni-tabbar,
+.uni-tabbar-bottom,
+.uni-tabbar-border {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* 移除 tabbar 占位 */
+uni-app.uni-app--showtabbar .uni-app--tabbar {
+  display: none !important;
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+/* 通用动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20rpx); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease;
+}
+
+/* 点击态 */
+.hover-opacity {
+  transition: opacity 0.2s;
+}
+.hover-opacity:active {
+  opacity: 0.7;
+}
+
+/* 文字省略 */
+.ellipsis {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.text-ellipsis-2 {
+
+.ellipsis-2 {
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -98,51 +112,9 @@ view, text, input, scroll-view {
   -webkit-box-orient: vertical;
 }
 
-/* H5 TabBar */
-.h5-tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  height: 120rpx;
-  padding-bottom: env(safe-area-inset-bottom);
-  background: #FFFFFF;
-  border-top: 1rpx solid #E8E2D8;
-  z-index: 999;
-  backdrop-filter: blur(20rpx);
-  -webkit-backdrop-filter: blur(20rpx);
-}
-.h5-tabbar .tab-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 4rpx;
-  transition: all 0.2s ease;
-}
-.h5-tabbar .tab-icon {
-  font-size: 36rpx;
-  color: #AAA;
-  line-height: 1;
-  transition: color 0.2s ease;
-}
-.h5-tabbar .tab-text {
-  font-size: 22rpx;
-  color: #AAA;
-  font-family: 'Inter', -apple-system, sans-serif;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-.h5-tabbar .tab-item.active .tab-icon {
-  color: #E8A23E;
-}
-.h5-tabbar .tab-item.active .tab-text {
-  color: #E8A23E;
-  font-weight: 600;
+/* 禁用状态 */
+.disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 </style>

@@ -1,8 +1,14 @@
 <template>
-  <view class="page" :style="{ backgroundColor: COLORS.bg }">
-    <view class="nav-back" @click="uni.navigateBack()">
-      <text class="back-arrow">←</text>
-      <text class="back-text">返回</text>
+  <view class="page" :style="{ backgroundColor: '#F5F0EA' }">
+    <!-- 顶部导航栏 -->
+    <view class="top-bar">
+      <view class="nav-back" @click="uni.navigateBack()">
+        <text class="back-arrow">←</text>
+        <text class="back-text">返回</text>
+      </view>
+      <view class="nav-actions">
+        <text class="share-icon">↗</text>
+      </view>
     </view>
 
     <view class="skeleton" v-if="isLoading">
@@ -30,6 +36,7 @@
     </view>
 
     <template v-else>
+      <!-- 书头区：大封面 + 右侧信息 -->
       <view class="book-header">
         <view class="cover" :style="{ backgroundColor: coverColor }">
           <image v-if="book.cover" class="cover-img" :src="book.cover" mode="aspectFill" />
@@ -37,16 +44,20 @@
         </view>
         <view class="book-meta">
           <text class="title">{{ book.title }}</text>
-          <view class="meta-row">
-            <text class="author">{{ book.author }}</text>
-            <text class="meta-dot">·</text>
-            <text class="category">{{ book.category }}</text>
+          <text class="author">{{ book.author }}</text>
+          <view class="tag-row">
+            <text class="tag-pill" v-if="book.category">{{ book.category }}</text>
           </view>
-          <view class="score-wrap">
-            <text class="score">{{ book.rating }}</text>
-            <text class="score-label">分</text>
+          <view class="stats-row">
+            <view class="stat">
+              <text class="score">{{ book.rating }}</text>
+              <text class="score-label">分</text>
+            </view>
+            <view class="stat-divider" />
+            <text class="stat-text">{{ chapters.length }}章</text>
+            <view class="stat-divider" />
+            <text class="stat-text">{{ priceText }}</text>
           </view>
-          <text class="price">{{ priceText }} · {{ chapters.length }}章</text>
           <view class="shelf-action" :class="{ active: inShelf }" @click="toggleShelf">
             <svg class="shelf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -57,11 +68,23 @@
         </view>
       </view>
 
+      <!-- 操作按钮 -->
+      <view class="actions">
+        <view class="btn btn-outline" @click="toggleShelf">
+          <text>{{ inShelf ? '已在书架' : '加入书架' }}</text>
+        </view>
+        <view class="btn btn-solid" @click="goReader()">
+          <text>{{ lastChapterId ? '继续阅读' : '开始阅读' }}</text>
+        </view>
+      </view>
+
+      <!-- 简介区 -->
       <view class="summary">
         <text class="section-title">简介</text>
         <text class="summary-text">{{ book.summary }}</text>
       </view>
 
+      <!-- 目录列表 -->
       <view class="chapters">
         <view class="section-header">
           <text class="section-title">章节目录</text>
@@ -75,15 +98,6 @@
           :is-premium="!ch.isFree"
           @click="goReader(ch)"
         />
-      </view>
-
-      <view class="actions">
-        <view class="btn btn-primary" @click="goReader()">
-          <text>{{ lastChapterId ? '继续阅读' : '开始阅读' }}</text>
-        </view>
-        <view class="btn btn-secondary" @click="goRecharge">
-          <text>充值</text>
-        </view>
       </view>
 
       <Folio :num="5" />
@@ -102,6 +116,7 @@ import Folio from '@/components/Folio.vue';
 const book = ref<Partial<Book>>({});
 const chapters = ref<Chapter[]>([]);
 const isLoading = ref(true);
+const firstLoad = ref(true);
 const inShelf = ref(false);
 const lastChapterId = ref<number | null>(null);
 
@@ -124,6 +139,7 @@ onLoad(async (opts: any) => {
     console.error('fetch detail failed', e);
   } finally {
     isLoading.value = false;
+  firstLoad.value = false;
   }
 });
 
@@ -189,117 +205,161 @@ const toggleShelf = async () => {
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 48rpx 32rpx 120rpx;
+  padding: 0 32rpx 120rpx;
+  background: #F5F0EA;
+}
+
+/* 顶部导航 */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 0 16rpx;
+  margin-bottom: 16rpx;
 }
 .nav-back {
   display: flex;
   align-items: center;
   gap: 8rpx;
-  margin-bottom: 32rpx;
 }
 .back-arrow {
   font-size: 36rpx;
-  color: #2C2C2C;
+  color: #E8A23E;
+  font-weight: 600;
 }
 .back-text {
   font-size: 28rpx;
-  color: #888;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
 }
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+.share-icon {
+  font-size: 36rpx;
+  color: #E8A23E;
+  padding: 8rpx;
+}
+
+/* 书头区 */
 .book-header {
   display: flex;
   gap: 32rpx;
   margin-bottom: 32rpx;
 }
 .cover {
-  width: 200rpx;
-  height: 280rpx;
-  border-radius: 12rpx;
+  width: 280rpx;
+  aspect-ratio: 2 / 3;
+  border-radius: 4rpx;
+  border: 1rpx solid rgba(0,0,0,0.05);
+  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1), 0 4rpx 24rpx rgba(232,162,62,0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.4);
   flex-shrink: 0;
   overflow: hidden;
 }
 .cover-text {
   color: #fff;
-  font-size: 64rpx;
+  font-size: 72rpx;
   font-weight: 700;
+  font-family: 'Noto Serif SC', serif;
   opacity: 0.9;
 }
 .cover-img {
   width: 100%;
   height: 100%;
-  border-radius: 12rpx;
+  border-radius: 4rpx;
 }
 .book-meta {
   display: flex;
   flex-direction: column;
   justify-content: center;
   flex: 1;
+  overflow: hidden;
 }
 .title {
-  font-size: 44rpx;
+  font-size: 40rpx;
   font-weight: 700;
+  font-family: 'Noto Serif SC', serif;
   color: #2C2C2C;
   margin-bottom: 12rpx;
   word-break: break-word;
   overflow-wrap: break-word;
-}
-.meta-row {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
+  line-height: 1.3;
 }
 .author {
   font-size: 26rpx;
-  color: #888;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
+  margin-bottom: 12rpx;
   word-break: break-word;
 }
-.meta-dot {
-  font-size: 20rpx;
-  color: #AAA;
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 12rpx;
 }
-.category {
-  font-size: 26rpx;
-  color: #E8A23E;
+.tag-pill {
+  font-size: 22rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+  color: #888888;
+  background: #E8DED3;
+  padding: 4rpx 16rpx;
+  border-radius: 48rpx;
+  font-weight: 500;
 }
-.score-wrap {
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+  flex-wrap: wrap;
+}
+.stat {
   display: flex;
   align-items: baseline;
   gap: 4rpx;
-  margin-bottom: 12rpx;
-  flex-wrap: wrap;
 }
 .score {
   font-size: 36rpx;
   font-weight: 700;
   color: #E8A23E;
+  font-family: 'Noto Serif SC', serif;
 }
 .score-label {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #E8A23E;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.price {
+.stat-divider {
+  width: 1rpx;
+  height: 28rpx;
+  background: #E8E2D8;
+}
+.stat-text {
   font-size: 24rpx;
   color: #888888;
-  margin-bottom: 8rpx;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 .shelf-action {
   display: inline-flex;
   align-items: center;
   gap: 8rpx;
-  margin-top: 16rpx;
+  margin-top: 8rpx;
   padding: 12rpx 24rpx;
-  border-radius: 32rpx;
+  border-radius: 48rpx;
   background: #FFFFFF;
   border: 1rpx solid #E8E2D8;
   align-self: flex-start;
+  transition: all 0.2s ease;
 }
 .shelf-action.active {
-  background: #2D6A4F;
-  border-color: #2D6A4F;
+  background: #E8A23E;
+  border-color: #E8A23E;
 }
 .shelf-action.active .shelf-action-text {
   color: #fff;
@@ -310,30 +370,74 @@ const toggleShelf = async () => {
 .shelf-icon {
   width: 28rpx;
   height: 28rpx;
-  stroke: #888888;
+  stroke: #AAAAAA;
 }
 .shelf-action-text {
   font-size: 24rpx;
   color: #2C2C2C;
+  font-family: 'Noto Sans SC', sans-serif;
   font-weight: 500;
 }
+
+/* 操作按钮 */
+.actions {
+  display: flex;
+  gap: 24rpx;
+  padding: 8rpx 0 24rpx;
+}
+.btn {
+  flex: 1;
+  padding: 24rpx 0;
+  border-radius: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.btn-outline {
+  background: #FFFFFF;
+  border: 1rpx solid #E8E2D8;
+}
+.btn-outline text {
+  color: #2C2C2C;
+  font-size: 28rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 500;
+}
+.btn-solid {
+  background: #E8A23E;
+  border: none;
+  box-shadow: 0 4rpx 12rpx rgba(232,162,62,0.2);
+}
+.btn-solid text {
+  color: #fff;
+  font-size: 28rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 600;
+}
+
+/* 简介区 */
 .summary {
   padding: 24rpx 0;
   border-bottom: 1rpx solid #E8E2D8;
 }
 .section-title {
-  font-size: 28rpx;
-  font-weight: 600;
+  font-size: 30rpx;
+  font-weight: 700;
+  font-family: 'Noto Serif SC', serif;
   color: #2C2C2C;
   margin-bottom: 12rpx;
 }
 .summary-text {
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: #888888;
-  line-height: 1.6;
+  font-family: 'Noto Serif SC', serif;
+  line-height: 1.8;
   word-break: break-word;
   overflow-wrap: break-word;
 }
+
+/* 目录列表 */
 .chapters {
   padding: 24rpx 0;
 }
@@ -346,35 +450,7 @@ const toggleShelf = async () => {
 .section-sub {
   font-size: 24rpx;
   color: #4CAF50;
-}
-.actions {
-  display: flex;
-  gap: 24rpx;
-  padding: 24rpx 0;
-}
-.btn {
-  flex: 1;
-  padding: 24rpx 0;
-  border-radius: 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.btn-primary {
-  background: #E8A23E;
-}
-.btn-primary text {
-  color: #fff;
-  font-size: 30rpx;
-  font-weight: 600;
-}
-.btn-secondary {
-  background: #FFFFFF;
-  border: 1rpx solid #E8E2D8;
-}
-.btn-secondary text {
-  color: #2C2C2C;
-  font-size: 30rpx;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 
 /* 骨架屏 */
@@ -387,10 +463,10 @@ const toggleShelf = async () => {
   margin-bottom: 32rpx;
 }
 .skeleton-cover {
-  width: 200rpx;
-  height: 280rpx;
-  border-radius: 12rpx;
-  background: #E8E2D8;
+  width: 280rpx;
+  aspect-ratio: 2 / 3;
+  border-radius: 4rpx;
+  background: #F8F5F0;
   flex-shrink: 0;
 }
 .skeleton-meta {
@@ -412,7 +488,7 @@ const toggleShelf = async () => {
 }
 .skeleton-line {
   height: 28rpx;
-  background: #E8E2D8;
+  background: #F8F5F0;
   border-radius: 6rpx;
   width: 100%;
 }
@@ -424,8 +500,9 @@ const toggleShelf = async () => {
 .skeleton-line.w20 { width: 20%; }
 .skeleton-line.w10 { width: 48rpx; }
 @keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
+  0% { opacity: 1; }
   50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 .skeleton-cover, .skeleton-line {
   animation: skeleton-pulse 1.5s ease-in-out infinite;

@@ -56,9 +56,10 @@ interface ShelfItem {
 
 const records = ref<ShelfItem[]>([]);
 const isLoading = ref(true);
+const firstLoad = ref(true);
 
 async function loadShelf() {
-  isLoading.value = true;
+  isLoading.value = firstLoad.value;
   try {
     const items = await fetchShelf();
     console.log('[shelf] fetchShelf result count:', items?.length);
@@ -67,6 +68,7 @@ async function loadShelf() {
     console.error('fetch shelf failed', e);
   } finally {
     isLoading.value = false;
+  firstLoad.value = false;
   }
 }
 

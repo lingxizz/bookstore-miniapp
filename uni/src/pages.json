@@ -1,50 +1,45 @@
 {
   "pages": [
-    {
-      "path": "pages/index/index",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/store/store",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/shelf/shelf",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/me",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/detail/detail",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/reader/reader",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/recharge/recharge",
-      "style": { "navigationStyle": "custom" }
-    }
+    { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/store/store", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/shelf/shelf", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/me/me", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/detail/detail", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/reader/reader", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/recharge/recharge", "style": { "navigationStyle": "custom" } }
   ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "书页间",
+    "navigationBarBackgroundColor": "#F8F4F0",
+    "backgroundColor": "#F8F4F0",
+    "app-plus": {
+      "background": "#F8F4F0"
+    }
+  },
   "tabBar": {
-    "custom": true,
-    "color": "#AAA",
-    "selectedColor": "#E8A23E",
+    "color": "#888888",
+    "selectedColor": "#A34A2E",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "white",
+    "custom": true,
     "list": [
-      { "pagePath": "pages/index/index", "text": "\u53d1\u73b0" },
-      { "pagePath": "pages/store/store", "text": "\u4e66\u57ce" },
-      { "pagePath": "pages/shelf/shelf", "text": "\u4e66\u67b6" },
-      { "pagePath": "pages/me/me", "text": "\u6211\u7684" }
+      {
+        "pagePath": "pages/index/index",
+        "text": "发现"
+      },
+      {
+        "pagePath": "pages/store/store",
+        "text": "书城"
+      },
+      {
+        "pagePath": "pages/shelf/shelf",
+        "text": "书架"
+      },
+      {
+        "pagePath": "pages/me/me",
+        "text": "我的"
+      }
     ]
-  },
-  "globalStyle": {
-    "navigationStyle": "custom",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F0EA"
   }
 }

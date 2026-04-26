@@ -1,4 +1,4 @@
-// 小说阅读器设计系统 - Light/Warm Theme
+// 小说阅读器设计系统 - 暖白主题
 export const COLORS = {
   // 背景层级
   bg: '#F5F0EA',
@@ -25,7 +25,7 @@ export const COLORS = {
   danger: '#FF5252',
   vip: '#E8A23E',
 
-  // 兼容旧代码(映射到暖色)
+  // 兼容旧代码
   paper: '#F5F0EA',
   paperDark: '#EDE8E0',
   ink: '#2C2C2C',
@@ -41,7 +41,7 @@ export const COLORS = {
 
 export const FONTS = {
   serif: "'Noto Serif SC', 'Source Han Serif SC', Georgia, serif",
-  sans: "'Inter', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif",
+  sans: "'Noto Sans SC', 'Inter', -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif",
   mono: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
 };
 
@@ -52,7 +52,6 @@ export const COVERS = [
 
 export const ROMANS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
-// 圆角规范
 export const RADIUS = {
   sm: '8rpx',
   md: '12rpx',
@@ -61,7 +60,6 @@ export const RADIUS = {
   pill: '999rpx',
 };
 
-// 间距规范
 export const SPACING = {
   xs: '8rpx',
   sm: '12rpx',
