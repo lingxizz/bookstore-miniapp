@@ -8,16 +8,11 @@
     </view>
 
     <!-- 内容区 -->
-    <scroll-view
+    <view
+      id="reader-content"
       class="content-scroll"
-      scroll-y
-      :scroll-top="scrollTop"
-      @scroll="onScroll"
-      @scrolltolower="onScrollToLower"
-      @scrolltoupper="onScrollToUpper"
-      lower-threshold="500"
-      upper-threshold="100"
-      :style="{ filter: `brightness(${config.brightness}%)` }"
+      @scroll="onContentScroll"
+      :style="scrollStyle"
     >
       <view v-if="loadingPrev" class="loading-bar">
         <text>正在加载上一章...</text>
@@ -45,7 +40,7 @@
       </view>
 
       <view style="height: 200rpx" />
-    </scroll-view>
+    </view>
 
     <!-- 点击区域 -->
     <view class="tap-overlay" v-if="tapOverlayVisible">
@@ -252,7 +247,6 @@ const showMenu = ref(false);
 const showCatalog = ref(false);
 const showSettingsPanel = ref(false);
 const showAdUnlock = ref(false);
-const scrollTop = ref(0);
 const currentScrollTop = ref(0);
 const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
@@ -288,6 +282,10 @@ const settingsPanelStyle = computed(() => {
     dark: '#1A1A2E',
   };
   return { backgroundColor: map[config.value.theme] || '#F5F0EA' };
+});
+
+const scrollStyle = computed(() => {
+  return { filter: `brightness(${config.value.brightness}%)` };
 });
 
 const textStyle = computed(() => {
@@ -419,7 +417,8 @@ async function loadCurrentChapter() {
       title: data?.title || ch.title,
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     }];
-    scrollTop.value = 0;
+    const el = getScrollEl();
+    if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
   } catch (e) {
     console.error('load content failed', e);
@@ -442,18 +441,28 @@ function getPrevChapter() {
   return idx > 0 ? chapters.value[idx - 1] : null;
 }
 
-function onScroll(e: any) {
-  currentScrollTop.value = e.detail.scrollTop;
+function getScrollEl() {
+  return document.getElementById('reader-content');
 }
 
-function onScrollToLower() {
-  if (config.value.pagingMode !== 'scroll') return;
-  autoLoadNext();
-}
+function onContentScroll(e: any) {
+  const el = e.target;
+  currentScrollTop.value = el.scrollTop;
 
-function onScrollToUpper() {
   if (config.value.pagingMode !== 'scroll') return;
-  autoLoadPrev();
+
+  // 接近底部，自动加载下一章
+  if (!loadingNext.value) {
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceToBottom < 500) {
+      autoLoadNext();
+    }
+  }
+
+  // 接近顶部，自动加载上一章
+  if (!loadingPrev.value && el.scrollTop < 100) {
+    autoLoadPrev();
+  }
 }
 
 async function autoLoadNext() {
@@ -494,14 +503,15 @@ async function autoLoadPrev() {
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     };
 
-    const oldScrollTop = currentScrollTop.value;
+    const el = getScrollEl();
+    const oldScrollTop = el?.scrollTop || 0;
     sections.value.unshift(newSection);
 
     await nextTick();
     // 估算新内容高度
     const lineH = config.value.fontSize * 2 * (config.value.lineHeight / 100);
     const estimatedHeight = newSection.paragraphs.length * lineH + 120;
-    scrollTop.value = oldScrollTop + estimatedHeight;
+    if (el) el.scrollTop = oldScrollTop + estimatedHeight;
 
     chapterId.value = prevCh.id;
   } catch (e) {
@@ -538,13 +548,17 @@ function openSettings() {
 }
 
 function pageUp() {
+  const el = getScrollEl();
+  if (!el) return;
   const pageHeight = (uni.getSystemInfoSync().windowHeight || 600) * 0.85;
-  scrollTop.value = Math.max(0, currentScrollTop.value - pageHeight);
+  el.scrollTop = Math.max(0, el.scrollTop - pageHeight);
 }
 
 function pageDown() {
+  const el = getScrollEl();
+  if (!el) return;
   const pageHeight = (uni.getSystemInfoSync().windowHeight || 600) * 0.85;
-  scrollTop.value = currentScrollTop.value + pageHeight;
+  el.scrollTop = el.scrollTop + pageHeight;
   setTimeout(() => autoLoadNext(), 300);
 }
 
@@ -696,6 +710,10 @@ async function buyChapter() {
 .content-scroll {
   height: 100vh;
   padding: 0 40rpx;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  z-index: 1;
 }
 .section-block {
   padding: 40rpx 0;
