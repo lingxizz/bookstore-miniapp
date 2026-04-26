@@ -436,12 +436,12 @@ onLoad(async (opts: any) => {
   chapterId.value = parseInt(opts?.chapterId || '1');
   loadUnlockedFromStorage();
   await loadConfig();
+  checkShelfStatus();
   try {
     const book = await fetchBook(bookId.value);
     bookWordCount.value = book?.wordCount || 0;
     bookTitle.value = book?.title || '';
   } catch {}
-  checkShelfStatus();
   await loadChapters();
   await loadCurrentChapter();
 });
