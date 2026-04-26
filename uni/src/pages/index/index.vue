@@ -125,7 +125,7 @@
           </view>
         </scroll-view>
         <view class="rank-list">
-          <view class="rank-item" v-for="(item, idx) in filteredRank" :key="item.bookId" @click="goDetail(item.bookId)">
+          <view class="rank-item" v-for="(item, idx) in filteredRank" :key="item.bookId || item.id" @click="goDetail(item.bookId || item.id)">
             <text class="rank-num" :class="{ top3: idx < 3 }">{{ idx + 1 }}</text>
             <view class="rank-cover" :style="{ backgroundColor: item.coverColor || '#A34A2E' }">
               <image v-if="item.cover" class="rank-cover-img" :src="item.cover" mode="aspectFill" />
@@ -142,24 +142,27 @@
         </view>
       </view>
 
-      <!-- 猜你喜欢 (Bento Grid) -->
+      <!-- 猜你喜欢 -->
       <view class="section">
-        <text class="section-title">猜你喜欢</text>
-        <view class="bento-grid">
-          <view class="bento-item" v-for="(b, idx) in guessLike.slice(0, 3)" :key="b.id" 
-                :class="{ 'bento-wide': idx === 2 }" @click="goDetail(b.id)">
-            <view class="bento-cover" :style="{ backgroundColor: b.coverColor || '#A34A2E' }">
-              <image v-if="b.cover" class="bento-cover-img" :src="b.cover" mode="aspectFill" />
-              <text v-else class="bento-cover-text">{{ b.title.charAt(0) }}</text>
-            </view>
-            <view class="bento-info">
-              <text class="bento-title">{{ b.title }}</text>
-              <text class="bento-author">{{ b.author }}</text>
-              <text v-if="idx === 2" class="bento-desc">{{ b.summary }}</text>
-            </view>
-            <svg v-if="idx === 2" class="bento-arrow" viewBox="0 0 24 24" fill="none" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 18l6-6-6-6"/>
+        <view class="section-header">
+          <text class="section-title">猜你喜欢</text>
+          <view class="section-more" @click="shuffleGuessLike">
+            <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
             </svg>
+            <text>换一换</text>
+          </view>
+        </view>
+        <view class="guess-grid">
+          <view class="guess-item" v-for="b in displayedGuessLike" :key="b.id" @click="goDetail(b.id)">
+            <view class="guess-cover" :style="{ backgroundColor: b.coverColor || '#A34A2E' }">
+              <image v-if="b.cover" class="guess-cover-img" :src="b.cover" mode="aspectFill" />
+              <text v-else class="guess-cover-text">{{ b.title.charAt(0) }}</text>
+            </view>
+            <view class="guess-info">
+              <text class="guess-title">{{ b.title }}</text>
+              <text class="guess-author">{{ b.author }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -185,18 +188,20 @@ const quotes = ref([
 ]);
 const banners = ref<any[]>([]);
 const categories = ref<any[]>([
+  { id: 0, name: '全部' },
   { id: 1, name: '文学' },
   { id: 2, name: '科幻' },
   { id: 3, name: '心理' },
   { id: 4, name: '历史' },
   { id: 5, name: '悬疑' },
   { id: 6, name: '言情' },
-  { id: 7, name: '更多' },
+  { id: 999, name: '更多' },
 ]);
 const todayPick = ref<Partial<Book>>({});
 const hotRank = ref<RankItem[]>([]);
 const guessLike = ref<Book[]>([]);
-const activeCategory = ref<number>(0); // 0 = 全部
+const guessOffset = ref(0);
+const activeCategory = ref<number>(0);
 const isLoading = ref(true);
 const firstLoad = ref(true);
 
@@ -208,12 +213,23 @@ const filteredRank = computed(() => {
   return hotRank.value.filter(item => item.category === catName).slice(0, 5);
 });
 
+const displayedGuessLike = computed(() => {
+  const start = guessOffset.value;
+  return guessLike.value.slice(start, start + 4);
+});
+
 function selectCategory(c: any) {
   if (c.id === 999 || c.name === '更多') {
     goCategory(c);
     return;
   }
-  activeCategory.value = (activeCategory.value === c.id) ? 0 : c.id;
+  activeCategory.value = c.id;
+}
+
+function shuffleGuessLike() {
+  const total = guessLike.value.length;
+  if (total <= 4) return;
+  guessOffset.value = (guessOffset.value + 4) % total;
 }
 
 onMounted(() => {
@@ -238,10 +254,11 @@ async function loadData() {
       fetchGuessLike().catch(() => []),
     ]);
     banners.value = b;
-    if (c.length) categories.value = [...c, { id: 999, name: '更多' }];
+    if (c.length) categories.value = [{ id: 0, name: '全部' }, ...c, { id: 999, name: '更多' }];
     todayPick.value = enrichBook((t || [])[0] || {});
     hotRank.value = (r || []).slice(0, 5).map(enrichBook);
     guessLike.value = (g || []).slice(0, 6).map(enrichBook);
+    guessOffset.value = 0;
   } catch (e) {
     console.error('home load failed', e);
   } finally {
@@ -730,13 +747,17 @@ function goMore(type: string) {
   color: #FFFFFF;
 }
 
-/* Bento Grid */
-.bento-grid {
+/* 猜你喜欢 */
+.refresh-icon {
+  width: 24rpx;
+  height: 24rpx;
+}
+.guess-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20rpx;
 }
-.bento-item {
+.guess-item {
   background: #FFFFFF;
   border-radius: 20rpx;
   padding: 20rpx;
@@ -746,13 +767,7 @@ function goMore(type: string) {
   box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
   border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
-.bento-item.bento-wide {
-  grid-column: span 2;
-  flex-direction: row;
-  align-items: center;
-  gap: 20rpx;
-}
-.bento-cover {
+.guess-cover {
   width: 100%;
   aspect-ratio: 3 / 4;
   border-radius: 12rpx;
@@ -762,29 +777,23 @@ function goMore(type: string) {
   overflow: hidden;
   background: #F1EDE9;
 }
-.bento-wide .bento-cover {
-  width: 140rpx;
-  aspect-ratio: 3 / 4;
-  flex-shrink: 0;
-}
-.bento-cover-img {
+.guess-cover-img {
   width: 100%;
   height: 100%;
 }
-.bento-cover-text {
+.guess-cover-text {
   font-size: 48rpx;
   color: #fff;
   font-weight: 700;
   font-family: 'Noto Serif SC', serif;
 }
-.bento-info {
+.guess-info {
   display: flex;
   flex-direction: column;
   gap: 4rpx;
-  flex: 1;
   overflow: hidden;
 }
-.bento-title {
+.guess-title {
   font-size: 28rpx;
   font-weight: 600;
   color: #1C1C19;
@@ -793,26 +802,9 @@ function goMore(type: string) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bento-author {
+.guess-author {
   font-size: 22rpx;
   color: #55423D;
   font-family: 'Noto Sans SC', sans-serif;
-}
-.bento-desc {
-  font-size: 22rpx;
-  color: #645D55;
-  font-family: 'Noto Serif SC', serif;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  margin-top: 4rpx;
-}
-.bento-arrow {
-  width: 32rpx;
-  height: 32rpx;
-  flex-shrink: 0;
 }
 </style>
