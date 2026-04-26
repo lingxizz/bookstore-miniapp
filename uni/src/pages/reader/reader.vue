@@ -1054,6 +1054,17 @@ async function buyChapter() {
   background: rgba(26, 26, 46, 0.95);
   border-bottom-color: #333;
 }
+.shelf-btn {
+  font-size: 26rpx;
+  color: #FFFFFF;
+  background: #A34A2E;
+  padding: 10rpx 28rpx;
+  border-radius: 30rpx;
+  margin-left: auto;
+}
+.shelf-btn.in-shelf {
+  background: #999999;
+}
 .back-btn, .menu-btn {
   font-size: 36rpx;
   color: #2C2C2C;
