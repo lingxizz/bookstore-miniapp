@@ -16,17 +16,11 @@
       id="reader-content"
       class="content-scroll"
       @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <!-- 下拉加载指示器 -->
-      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="pullIndicatorStyle">
-        <view class="pull-spinner" :class="{ 'pull-spinner-active': pullState === 'loading' }">
-          <svg class="spinner" viewBox="0 0 50 50">
-            <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
-          </svg>
-        </view>
-        <text class="pull-text">{{ pullState === 'loading' ? '加载中...' : '释放加载上一章' }}</text>
-      </view>
+      <!-- 顶部哨兵：滚动到顶部时自动加载上一章 -->
+      <view id="top-sentinel" style="height: 1px; margin-top: -1px;" />
 
       <view
         v-for="(section, index) in sections"
@@ -337,22 +331,6 @@ const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
 const pullOffset = ref(0);
 const pullState = ref<'idle' | 'pulling' | 'loading'>('idle');
-
-// 下拉刷新专用状态（与 loadingPrev 分离）
-let isPulling = false;
-let pullStartY = 0;
-let pullStartX = 0;
-let isAtTop = false;
-
-// 下拉指示器样式
-const pullIndicatorStyle = computed(() => {
-  const height = Math.min(pullOffset.value, 80);
-  return {
-    height: height + 'px',
-    opacity: height > 0 ? Math.min(height / 40, 1) : 0,
-    transition: isPulling ? 'none' : 'all 0.3s ease',
-  };
-});
 
 // 目录相关
 const catalogDesc = ref(false);
@@ -705,22 +683,32 @@ function onScrollHandler() {
 // IntersectionObserver 设置
 function setupObservers() {
   const root = getScrollEl();
-  if (!root) return;
-
-  // 监听底部哨兵，提前 300px 触发
   const bottomSentinel = document.getElementById('bottom-sentinel');
-  if (bottomSentinel) {
-    if (bottomObserver) bottomObserver.disconnect();
-    bottomObserver = new IntersectionObserver((entries) => {
+  const topSentinel = document.getElementById('top-sentinel');
+
+  if (!root || !bottomSentinel) return;
+
+  // 底部哨兵：加载下一章
+  bottomObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && !loadingNext.value) {
+        autoLoadNext();
+      }
+    });
+  }, { root, rootMargin: '0px 0px 300px 0px', threshold: 0 });
+  bottomObserver.observe(bottomSentinel);
+
+  // 顶部哨兵：加载上一章
+  if (topSentinel) {
+    topObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting && !loadingNext.value) {
-          autoLoadNext();
+        if (entry.isIntersecting && !loadingPrev.value) {
+          autoLoadPrev();
         }
       });
-    }, { root, rootMargin: '0px 0px 300px 0px', threshold: 0 });
-    bottomObserver.observe(bottomSentinel);
+    }, { root, rootMargin: '100px 0px 0px 0px', threshold: 0 });
+    topObserver.observe(topSentinel);
   }
-
 }
 
 function teardownObservers() {
@@ -732,7 +720,6 @@ onMounted(() => {
   const el = getScrollEl();
   if (el) {
     el.addEventListener('scroll', onScrollHandler, { passive: true });
-    bindPullEvents(el);
   }
   setupObservers();
 });
@@ -741,7 +728,6 @@ onUnmounted(() => {
   const el = getScrollEl();
   if (el) {
     el.removeEventListener('scroll', onScrollHandler);
-    unbindPullEvents(el);
   }
   teardownObservers();
   if (saveProgressTimer) clearTimeout(saveProgressTimer);
@@ -759,88 +745,9 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
-  // 同时更新下拉专用的起始坐标
-  pullStartX = e.touches[0].clientX;
-  pullStartY = e.touches[0].clientY;
-  // 如果上次加载已完成，重置下拉状态
-  if (pullState.value === 'loading' && !loadingPrev.value) {
-    resetPullState();
-  }
-  console.log('[PULL] touchstart', { pullState: pullState.value, scrollTop: getScrollEl()?.scrollTop });
 }
 
-// 原生 touchmove 处理器（绑定 passive: false）
-function onNativeTouchMove(e: TouchEvent) {
-  if (pullState.value === 'loading') {
-    console.log('[PULL] touchmove blocked, state=loading');
-    return;
-  }
-
-  const el = getScrollEl();
-  if (!el) return;
-
-  // 不在顶部，不处理下拉
-  if (el.scrollTop > 2) {
-    if (pullState.value !== 'idle') {
-      resetPullState();
-    }
-    return;
-  }
-
-  const touch = e.touches[0];
-  const deltaY = touch.clientY - pullStartY;
-  const deltaX = Math.abs(touch.clientX - pullStartX);
-
-  console.log('[PULL] touchmove', { deltaY, deltaX, scrollTop: el.scrollTop, pullState: pullState.value });
-
-  // 向上滑动，重置
-  if (deltaY <= 0) {
-    if (pullState.value !== 'idle') resetPullState();
-    return;
-  }
-
-  // 横向滑动为主，不处理
-  if (deltaX > deltaY * 1.5) return;
-
-  // 阻止默认行为（iOS 橡皮筋）
-  e.preventDefault();
-
-  isPulling = true;
-
-  // 阻尼计算：越拉越难拉
-  const damped = deltaY * 0.35;
-  pullOffset.value = Math.min(damped, 80);
-
-  // 超过阈值进入 release 状态
-  if (pullOffset.value >= 50) {
-    pullState.value = 'pulling'; // 保持 pulling，在 touchend 时触发 loading
-  } else {
-    pullState.value = 'pulling';
-  }
-}
-
-// 原生 touchend 处理器
-function onNativeTouchEnd(e: TouchEvent) {
-  console.log('[PULL] touchend', { pullState: pullState.value, isPulling, pullOffset: pullOffset.value });
-
-  // 如果正在加载中，忽略
-  if (pullState.value === 'loading') return;
-
-  const wasPulling = isPulling;
-  isPulling = false;
-
-  // 如果正在下拉且超过阈值，触发加载
-  if (wasPulling && pullOffset.value >= 50) {
-    pullState.value = 'loading';
-    pullOffset.value = 40;
-    autoLoadPrev();
-    return;
-  }
-
-  // 否则重置下拉状态
-  resetPullState();
-
-  // 点击区域识别（只在非下拉时处理）
+function onTouchEnd(e: any) {
   const dx = e.changedTouches[0].clientX - touchStartX;
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
@@ -860,26 +767,6 @@ function onNativeTouchEnd(e: TouchEvent) {
     onTapCenter();
   }
 }
-
-function resetPullState() {
-  pullState.value = 'idle';
-  pullOffset.value = 0;
-  isPulling = false;
-  console.log('[PULL] reset to idle');
-}
-
-// 绑定/解绑原生事件
-function bindPullEvents(el: HTMLElement) {
-  el.addEventListener('touchmove', onNativeTouchMove, { passive: false });
-  el.addEventListener('touchend', onNativeTouchEnd, { passive: true });
-}
-
-function unbindPullEvents(el: HTMLElement) {
-  el.removeEventListener('touchmove', onNativeTouchMove);
-  el.removeEventListener('touchend', onNativeTouchEnd);
-}
-
-// 内容不够一页时自动预加载
 async function checkAndLoadMore() {
   await nextTick();
   const el = getScrollEl();
