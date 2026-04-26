@@ -12,6 +12,8 @@
       id="reader-content"
       class="content-scroll"
       @scroll="onContentScroll"
+      @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
       :style="scrollStyle"
     >
       <view v-if="loadingPrev" class="loading-bar">
@@ -42,12 +44,6 @@
       <view style="height: 200rpx" />
     </view>
 
-    <!-- 点击区域 -->
-    <view class="tap-overlay" v-if="tapOverlayVisible">
-      <view class="tap-zone tap-left" @click="onTapLeft" />
-      <view class="tap-zone tap-center" @click="onTapCenter" />
-      <view class="tap-zone tap-right" @click="onTapRight" />
-    </view>
 
     <!-- 底部栏 -->
     <view class="reader-bottom" v-if="showMenu" @click.stop>
@@ -315,10 +311,6 @@ const currentTitle = computed(() => {
   return ch?.title || '';
 });
 
-const tapOverlayVisible = computed(() => {
-  return !showMenu.value && !showSettingsPanel.value && !showCatalog.value && !showAdUnlock.value;
-});
-
 const chapterPrice = computed(() => {
   const ch = chapters.value.find(c => c.id === chapterId.value);
   return ch?.price || 10;
@@ -420,6 +412,7 @@ async function loadCurrentChapter() {
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
+    await checkAndLoadMore();
   } catch (e) {
     console.error('load content failed', e);
   } finally {
@@ -465,6 +458,49 @@ function onContentScroll(e: any) {
   }
 }
 
+// 触摸点击区域识别
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartTime = 0;
+
+function onTouchStart(e: any) {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+}
+
+function onTouchEnd(e: any) {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartTime;
+
+  // 移动距离大或时间长 = 滑动，不是点击
+  if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
+
+  const x = e.changedTouches[0].clientX;
+  const width = uni.getSystemInfoSync().windowWidth || 375;
+  const ratio = x / width;
+
+  if (ratio < 0.28) {
+    onTapLeft();
+  } else if (ratio > 0.72) {
+    onTapRight();
+  } else {
+    onTapCenter();
+  }
+}
+
+// 内容不够一页时自动预加载
+async function checkAndLoadMore() {
+  await nextTick();
+  const el = getScrollEl();
+  if (!el) return;
+  // 如果内容高度 <= 容器高度，没有滚动空间，主动加载下一章
+  if (el.scrollHeight <= el.clientHeight + 20) {
+    await autoLoadNext();
+  }
+}
+
 async function autoLoadNext() {
   const nextCh = getNextChapter();
   if (!nextCh) return;
@@ -481,6 +517,7 @@ async function autoLoadNext() {
     });
     chapterId.value = nextCh.id;
     saveProgress(bookId.value, nextCh.id, 0).catch(() => {});
+    await checkAndLoadMore();
   } catch (e) {
     console.error('auto load next failed', e);
   } finally {
@@ -738,31 +775,6 @@ async function buyChapter() {
   font-family: 'Noto Sans SC', sans-serif;
 }
 
-/* 点击区域 - pointer-events: none 避免拦截滚动 */
-.tap-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
-  display: flex;
-  flex-direction: row;
-  pointer-events: none;
-}
-.tap-zone {
-  height: 100%;
-  pointer-events: auto;
-}
-.tap-left {
-  width: 30%;
-}
-.tap-center {
-  width: 40%;
-}
-.tap-right {
-  width: 30%;
-}
 
 /* 底部栏 */
 .reader-bottom {
