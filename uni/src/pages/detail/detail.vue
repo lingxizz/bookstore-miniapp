@@ -1,16 +1,6 @@
 <template>
-  <view class="page" :style="{ backgroundColor: '#F5F0EA' }">
-    <!-- 顶部导航栏 -->
-    <view class="top-bar">
-      <view class="nav-back" @click="uni.navigateBack()">
-        <text class="back-arrow">←</text>
-        <text class="back-text">返回</text>
-      </view>
-      <view class="nav-actions">
-        <text class="share-icon">↗</text>
-      </view>
-    </view>
-
+  <view class="page" :style="{ backgroundColor: '#F8F4F0' }">
+    <!-- Loading skeleton -->
     <view class="skeleton" v-if="isLoading">
       <view class="skeleton-header">
         <view class="skeleton-cover" />
@@ -36,7 +26,17 @@
     </view>
 
     <template v-else>
-      <!-- 书头区：大封面 + 右侧信息 -->
+      <!-- Top bar -->
+      <view class="top-bar">
+        <view class="nav-back" @click="uni.navigateBack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+          <text class="back-text">返回</text>
+        </view>
+      </view>
+
+      <!-- Book header card -->
       <view class="book-header">
         <view class="cover" :style="{ backgroundColor: coverColor }">
           <image v-if="book.cover" class="cover-img" :src="book.cover" mode="aspectFill" />
@@ -46,7 +46,8 @@
           <text class="title">{{ book.title }}</text>
           <text class="author">{{ book.author }}</text>
           <view class="tag-row">
-            <text class="tag-pill" v-if="book.category">{{ book.category }}</text>
+            <text class="tag-pill">{{ book.category }}</text>
+            <text class="tag-pill wordcount">{{ formatWordCount(book.wordCount) }}字</text>
           </view>
           <view class="stats-row">
             <view class="stat">
@@ -56,21 +57,18 @@
             <view class="stat-divider" />
             <text class="stat-text">{{ chapters.length }}章</text>
             <view class="stat-divider" />
-            <text class="stat-text">{{ priceText }}</text>
-          </view>
-          <view class="shelf-action" :class="{ active: inShelf }" @click="toggleShelf">
-            <svg class="shelf-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            </svg>
-            <text class="shelf-action-text">{{ inShelf ? '已加入书架' : '加入书架' }}</text>
+            <text class="stat-text" :class="book.status">{{ book.status === 'completed' ? '已完结' : '连载中' }}</text>
           </view>
         </view>
       </view>
 
-      <!-- 操作按钮 -->
+      <!-- Action buttons -->
       <view class="actions">
-        <view class="btn btn-outline" @click="toggleShelf">
+        <view class="btn btn-outline" :class="{ active: inShelf }" @click="toggleShelf">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
           <text>{{ inShelf ? '已在书架' : '加入书架' }}</text>
         </view>
         <view class="btn btn-solid" @click="goReader()">
@@ -78,13 +76,13 @@
         </view>
       </view>
 
-      <!-- 简介区 -->
+      <!-- Summary card -->
       <view class="summary">
         <text class="section-title">简介</text>
         <text class="summary-text">{{ book.summary }}</text>
       </view>
 
-      <!-- 目录列表 -->
+      <!-- Chapters card -->
       <view class="chapters">
         <view class="section-header">
           <text class="section-title">章节目录</text>
@@ -108,7 +106,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
-import { COLORS, COVERS } from '@/utils/constants';
+import { COVERS } from '@/utils/constants';
 import { fetchBook, fetchChapters, checkShelf, fetchProgress, addToShelf, removeFromShelf, type Book, type Chapter } from '@/api/book';
 import ChapterItem from '@/components/ChapterItem.vue';
 import Folio from '@/components/Folio.vue';
@@ -139,16 +137,17 @@ onLoad(async (opts: any) => {
     console.error('fetch detail failed', e);
   } finally {
     isLoading.value = false;
-  firstLoad.value = false;
+    firstLoad.value = false;
   }
 });
 
 const freeCount = computed(() => chapters.value.filter(c => c.isFree).length);
-const priceText = computed(() => {
-  if (chapters.value.every(c => c.isFree)) return '全本免费';
-  if (freeCount.value > 0) return `前${freeCount.value}章免费`;
-  return `${book.value.price || 10}金币/章`;
-});
+
+function formatWordCount(n?: number): string {
+  if (!n) return '0';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return String(n);
+}
 
 const goReader = (ch?: Chapter) => {
   const targetCh = ch || chapters.value.find(c => c.id === lastChapterId.value) || chapters.value[0];
@@ -156,10 +155,6 @@ const goReader = (ch?: Chapter) => {
   uni.navigateTo({
     url: `/pages/reader/reader?bookId=${book.value.id}&chapterId=${targetCh.id}`
   });
-};
-
-const goRecharge = () => {
-  uni.navigateTo({ url: '/pages/recharge/recharge' });
 };
 
 const toggleShelf = async () => {
@@ -171,7 +166,7 @@ const toggleShelf = async () => {
       content: '登录后即可管理书架',
       showCancel: true,
       success: (res: any) => {
-        if (res.confirm) uni.navigateTo({ url: '/pages/me/me' });
+        if (res.confirm) uni.switchTab({ url: '/pages/me/me' });
       }
     });
     return;
@@ -193,7 +188,7 @@ const toggleShelf = async () => {
         title: '登录已过期',
         content: '请重新登录',
         showCancel: false,
-        success: () => uni.navigateTo({ url: '/pages/me/me' })
+        success: () => uni.switchTab({ url: '/pages/me/me' })
       });
       return;
     }
@@ -206,118 +201,107 @@ const toggleShelf = async () => {
 .page {
   min-height: 100vh;
   padding: 0 32rpx 120rpx;
-  background: #F5F0EA;
+  background: #F8F4F0;
 }
 
-/* 顶部导航 */
+/* Top bar */
 .top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 24rpx 0 16rpx;
-  margin-bottom: 16rpx;
 }
 .nav-back {
   display: flex;
   align-items: center;
   gap: 8rpx;
 }
-.back-arrow {
-  font-size: 36rpx;
-  color: #E8A23E;
-  font-weight: 600;
+.nav-back svg {
+  width: 32rpx;
+  height: 32rpx;
 }
 .back-text {
   font-size: 28rpx;
-  color: #888888;
+  color: #A34A2E;
   font-family: 'Noto Sans SC', sans-serif;
 }
-.nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-}
-.share-icon {
-  font-size: 36rpx;
-  color: #E8A23E;
-  padding: 8rpx;
-}
 
-/* 书头区 */
+/* Book header */
 .book-header {
   display: flex;
   gap: 32rpx;
-  margin-bottom: 32rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(163, 74, 46, 0.04);
+  border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
 .cover {
-  width: 280rpx;
+  width: 200rpx;
   aspect-ratio: 2 / 3;
-  border-radius: 4rpx;
-  border: 1rpx solid rgba(0,0,0,0.05);
-  box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1), 0 4rpx 24rpx rgba(232,162,62,0.08);
+  border-radius: 16rpx;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   overflow: hidden;
-}
-.cover-text {
-  color: #fff;
-  font-size: 72rpx;
-  font-weight: 700;
-  font-family: 'Noto Serif SC', serif;
-  opacity: 0.9;
+  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.1);
 }
 .cover-img {
   width: 100%;
   height: 100%;
-  border-radius: 4rpx;
+}
+.cover-text {
+  color: #fff;
+  font-size: 64rpx;
+  font-weight: 700;
+  font-family: 'Noto Serif SC', serif;
 }
 .book-meta {
   display: flex;
   flex-direction: column;
   justify-content: center;
   flex: 1;
+  gap: 12rpx;
   overflow: hidden;
 }
 .title {
-  font-size: 40rpx;
+  font-size: 36rpx;
   font-weight: 700;
   font-family: 'Noto Serif SC', serif;
-  color: #2C2C2C;
-  margin-bottom: 12rpx;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  color: #1C1C19;
   line-height: 1.3;
+  word-break: break-word;
 }
 .author {
   font-size: 26rpx;
-  color: #888888;
+  color: #55423D;
   font-family: 'Noto Sans SC', sans-serif;
-  margin-bottom: 12rpx;
-  word-break: break-word;
 }
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8rpx;
-  margin-bottom: 12rpx;
+  gap: 12rpx;
 }
 .tag-pill {
   font-size: 22rpx;
   font-family: 'Noto Sans SC', sans-serif;
-  color: #888888;
-  background: #E8DED3;
-  padding: 4rpx 16rpx;
+  color: #A34A2E;
+  background: rgba(163, 74, 46, 0.08);
+  padding: 6rpx 16rpx;
   border-radius: 48rpx;
-  font-weight: 500;
+}
+.tag-pill.wordcount {
+  color: #645D55;
+  background: #F5F0EA;
 }
 .stats-row {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin-bottom: 12rpx;
   flex-wrap: wrap;
+  margin-top: 4rpx;
 }
 .stat {
   display: flex;
@@ -327,12 +311,12 @@ const toggleShelf = async () => {
 .score {
   font-size: 36rpx;
   font-weight: 700;
-  color: #E8A23E;
+  color: #A34A2E;
   font-family: 'Noto Serif SC', serif;
 }
 .score-label {
   font-size: 22rpx;
-  color: #E8A23E;
+  color: #A34A2E;
   font-family: 'Noto Sans SC', sans-serif;
 }
 .stat-divider {
@@ -342,48 +326,21 @@ const toggleShelf = async () => {
 }
 .stat-text {
   font-size: 24rpx;
-  color: #888888;
+  color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
 }
-.shelf-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  margin-top: 8rpx;
-  padding: 12rpx 24rpx;
-  border-radius: 48rpx;
-  background: #FFFFFF;
-  border: 1rpx solid #E8E2D8;
-  align-self: flex-start;
-  transition: all 0.2s ease;
+.stat-text.ongoing {
+  color: #4CAF50;
 }
-.shelf-action.active {
-  background: #E8A23E;
-  border-color: #E8A23E;
-}
-.shelf-action.active .shelf-action-text {
-  color: #fff;
-}
-.shelf-action.active .shelf-icon {
-  stroke: #fff;
-}
-.shelf-icon {
-  width: 28rpx;
-  height: 28rpx;
-  stroke: #AAAAAA;
-}
-.shelf-action-text {
-  font-size: 24rpx;
-  color: #2C2C2C;
-  font-family: 'Noto Sans SC', sans-serif;
-  font-weight: 500;
+.stat-text.completed {
+  color: #A34A2E;
 }
 
-/* 操作按钮 */
+/* Action buttons */
 .actions {
   display: flex;
   gap: 24rpx;
-  padding: 8rpx 0 24rpx;
+  margin-bottom: 24rpx;
 }
 .btn {
   flex: 1;
@@ -392,22 +349,31 @@ const toggleShelf = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
   transition: all 0.2s ease;
 }
 .btn-outline {
   background: #FFFFFF;
-  border: 1rpx solid #E8E2D8;
+  border: 1rpx solid rgba(163, 74, 46, 0.2);
+  box-shadow: 0 2rpx 12rpx rgba(163, 74, 46, 0.04);
 }
 .btn-outline text {
-  color: #2C2C2C;
+  color: #1C1C19;
   font-size: 28rpx;
   font-family: 'Noto Sans SC', sans-serif;
   font-weight: 500;
 }
+.btn-outline.active {
+  background: rgba(163, 74, 46, 0.08);
+  border-color: #A34A2E;
+}
+.btn-outline.active text {
+  color: #A34A2E;
+}
 .btn-solid {
-  background: #E8A23E;
+  background: #A34A2E;
   border: none;
-  box-shadow: 0 4rpx 12rpx rgba(232,162,62,0.2);
+  box-shadow: 0 4rpx 16rpx rgba(163, 74, 46, 0.2);
 }
 .btn-solid text {
   color: #fff;
@@ -415,37 +381,48 @@ const toggleShelf = async () => {
   font-family: 'Noto Sans SC', sans-serif;
   font-weight: 600;
 }
+.btn-icon {
+  width: 28rpx;
+  height: 28rpx;
+}
 
-/* 简介区 */
+/* Summary card */
 .summary {
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #E8E2D8;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 24rpx rgba(163, 74, 46, 0.04);
+  border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
 .section-title {
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: 700;
   font-family: 'Noto Serif SC', serif;
-  color: #2C2C2C;
-  margin-bottom: 12rpx;
+  color: #1C1C19;
+  margin-bottom: 16rpx;
 }
 .summary-text {
   font-size: 28rpx;
-  color: #888888;
+  color: #645D55;
   font-family: 'Noto Serif SC', serif;
   line-height: 1.8;
   word-break: break-word;
-  overflow-wrap: break-word;
 }
 
-/* 目录列表 */
+/* Chapters card */
 .chapters {
-  padding: 24rpx 0;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 4rpx 24rpx rgba(163, 74, 46, 0.04);
+  border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12rpx;
+  margin-bottom: 16rpx;
 }
 .section-sub {
   font-size: 24rpx;
@@ -453,20 +430,23 @@ const toggleShelf = async () => {
   font-family: 'Noto Sans SC', sans-serif;
 }
 
-/* 骨架屏 */
+/* Skeleton */
 .skeleton {
   padding: 0;
 }
 .skeleton-header {
   display: flex;
   gap: 32rpx;
-  margin-bottom: 32rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
 }
 .skeleton-cover {
-  width: 280rpx;
+  width: 200rpx;
   aspect-ratio: 2 / 3;
-  border-radius: 4rpx;
-  background: #F8F5F0;
+  border-radius: 16rpx;
+  background: #F5F0EA;
   flex-shrink: 0;
 }
 .skeleton-meta {
@@ -477,18 +457,21 @@ const toggleShelf = async () => {
   gap: 16rpx;
 }
 .skeleton-block {
-  margin-bottom: 32rpx;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
 }
 .skeleton-item {
   display: flex;
   align-items: center;
   gap: 16rpx;
   padding: 24rpx 0;
-  border-bottom: 1rpx solid #E8E2D8;
+  border-bottom: 1rpx solid #F5F0EA;
 }
 .skeleton-line {
   height: 28rpx;
-  background: #F8F5F0;
+  background: #F5F0EA;
   border-radius: 6rpx;
   width: 100%;
 }

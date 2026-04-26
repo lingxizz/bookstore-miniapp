@@ -72,12 +72,16 @@
             <text class="book-title">{{ book.title }}</text>
             <text class="book-author">{{ book.author }}</text>
             <view class="book-meta">
-              <text class="book-cat">{{ book.category }}</text>
-              <text class="book-status" :class="book.status">{{ book.status === 'completed' ? '完本' : '连载' }}</text>
+              <text class="book-tag category">{{ book.category }}</text>
+              <text class="book-tag wordcount">{{ formatWordCount(book.wordCount) }}字</text>
             </view>
-            <view class="book-rating" v-if="book.rating">
-              <text class="rating-star">★</text>
-              <text class="rating-num">{{ book.rating }}</text>
+            <view class="book-extra">
+              <text class="book-status" :class="book.status">{{ book.status === 'completed' ? '已完结' : '连载中' }}</text>
+              <text v-if="book.status === 'ongoing' && book.chapterCount" class="book-chapters">更新至{{ book.chapterCount }}章</text>
+              <view class="book-rating" v-if="book.rating">
+                <text class="rating-star">★</text>
+                <text class="rating-num">{{ book.rating }}</text>
+              </view>
             </view>
           </view>
         </view>
@@ -159,6 +163,11 @@ function goDetail(id: number) {
 }
 function goSearch() {
   uni.navigateTo({ url: '/pages/search/search' });
+}
+function formatWordCount(n?: number): string {
+  if (!n) return '0';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return String(n);
 }
 </script>
 
@@ -336,15 +345,17 @@ function goSearch() {
 }
 .book-row {
   display: flex;
-  gap: 20rpx;
-  padding: 20rpx 0;
-  border-bottom: 1rpx solid #F5F0EA;
-}
-.book-row:last-child {
-  border-bottom: none;
+  align-items: flex-start;
+  gap: 24rpx;
+  padding: 24rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
 .book-cover {
-  width: 140rpx;
+  width: 120rpx;
   aspect-ratio: 2 / 3;
   border-radius: 12rpx;
   flex-shrink: 0;
@@ -367,8 +378,10 @@ function goSearch() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8rpx;
+  justify-content: space-between;
+  gap: 12rpx;
   overflow: hidden;
+  min-height: 180rpx;
 }
 .book-title {
   font-size: 30rpx;
@@ -385,22 +398,47 @@ function goSearch() {
   display: flex;
   gap: 12rpx;
   align-items: center;
+  flex-wrap: wrap;
 }
-.book-cat {
-  font-size: 22rpx;
-  color: #645D55;
+.book-tag {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
   font-family: 'Noto Sans SC', sans-serif;
+}
+.book-tag.category {
+  background: rgba(163, 74, 46, 0.08);
+  color: #A34A2E;
+}
+.book-tag.wordcount {
+  background: #F5F0EA;
+  color: #645D55;
+}
+.book-extra {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+  flex-wrap: wrap;
 }
 .book-status {
   font-size: 20rpx;
-  padding: 2rpx 10rpx;
+  padding: 4rpx 12rpx;
   border-radius: 8rpx;
-  background: #F0EBE3;
-  color: #645D55;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.book-status.ongoing {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
 }
 .book-status.completed {
-  background: rgba(163, 74, 46, 0.08);
+  background: rgba(163, 74, 46, 0.1);
   color: #A34A2E;
+}
+.book-chapters {
+  font-size: 20rpx;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 .book-rating {
   display: flex;

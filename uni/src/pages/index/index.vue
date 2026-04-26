@@ -76,12 +76,6 @@
       <view class="section">
         <view class="section-header">
           <text class="section-title">每日推荐</text>
-          <view class="section-more" @click="goMore('featured')">
-            <text>查看更多</text>
-            <svg viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-          </view>
         </view>
         <view class="featured-card" @click="goDetail(todayPick.id)">
           <view class="featured-cover" :style="{ backgroundColor: todayPick.coverColor || '#A34A2E' }">
@@ -109,37 +103,50 @@
       <view class="section">
         <view class="section-header">
           <text class="section-title">热门榜单</text>
-          <view class="section-more" @click="goMore('rank')">
-            <text>全部</text>
+          <view class="section-more" @click="goStore">
+            <text>更多</text>
             <svg viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
           </view>
         </view>
         <!-- 分类标签 -->
-        <scroll-view class="category-scroll" scroll-x show-scrollbar="false">
+        <view class="category-scroll">
           <view class="category-list">
-            <view class="category-tag" v-for="c in categories" :key="c.id" :class="{ active: activeCategory === c.id }" @click="selectCategory(c)">
-              <text>{{ c.name }}</text>
-            </view>
-          </view>
-        </scroll-view>
-        <view class="rank-list">
-          <view class="rank-item" v-for="(item, idx) in filteredRank" :key="item.bookId || item.id" @click="goDetail(item.bookId || item.id)">
-            <text class="rank-num" :class="{ top3: idx < 3 }">{{ idx + 1 }}</text>
-            <view class="rank-cover" :style="{ backgroundColor: item.coverColor || '#A34A2E' }">
-              <image v-if="item.cover" class="rank-cover-img" :src="item.cover" mode="aspectFill" />
-              <text v-else class="rank-cover-text">{{ item.title.charAt(0) }}</text>
-            </view>
-            <view class="rank-info">
-              <text class="rank-title">{{ item.title }}</text>
-              <text class="rank-author">{{ item.author }}</text>
-            </view>
-            <view class="rank-score">
-              <text>{{ item.rating }}分</text>
+            <view
+              class="category-tag"
+              v-for="c in rankTabs"
+              :key="c.id"
+              :class="{ active: activeCategory === c.id }"
+              @tap="selectCategory(c)"
+            >
+              {{ c.name }}
             </view>
           </view>
         </view>
+        <swiper class="rank-swiper" :current="activeRankTabIndex" @change="onRankSwiperChange">
+          <swiper-item v-for="(items, idx) in rankItemsByTab" :key="rankTabs[idx].id">
+            <view class="rank-list">
+              <view class="rank-item" v-for="(item, i) in items" :key="item.bookId || item.id" @click="goDetail(item.bookId || item.id)">
+                <text class="rank-num" :class="{ top3: i < 3 }">{{ i + 1 }}</text>
+                <view class="rank-cover" :style="{ backgroundColor: item.coverColor || '#A34A2E' }">
+                  <image v-if="item.cover" class="rank-cover-img" :src="item.cover" mode="aspectFill" />
+                  <text v-else class="rank-cover-text">{{ item.title.charAt(0) }}</text>
+                </view>
+                <view class="rank-info">
+                  <text class="rank-title">{{ item.title }}</text>
+                  <text class="rank-author">{{ item.author }}</text>
+                </view>
+                <view class="rank-score">
+                  <text>{{ item.rating }}分</text>
+                </view>
+              </view>
+              <view v-if="items.length === 0" class="rank-empty">
+                <text>暂无该分类书籍</text>
+              </view>
+            </view>
+          </swiper-item>
+        </swiper>
       </view>
 
       <!-- 猜你喜欢 -->
@@ -153,15 +160,19 @@
             <text>换一换</text>
           </view>
         </view>
-        <view class="guess-grid">
-          <view class="guess-item" v-for="b in displayedGuessLike" :key="b.id" @click="goDetail(b.id)">
-            <view class="guess-cover" :style="{ backgroundColor: b.coverColor || '#A34A2E' }">
-              <image v-if="b.cover" class="guess-cover-img" :src="b.cover" mode="aspectFill" />
-              <text v-else class="guess-cover-text">{{ b.title.charAt(0) }}</text>
+        <view class="guess-list">
+          <view class="guess-card" v-for="b in displayedGuessLike" :key="b.id" @click="goDetail(b.id)">
+            <view class="guess-card-cover" :style="{ backgroundColor: b.coverColor || '#A34A2E' }">
+              <image v-if="b.cover" class="guess-card-cover-img" :src="b.cover" mode="aspectFill" />
+              <text v-else class="guess-card-cover-text">{{ b.title.charAt(0) }}</text>
             </view>
-            <view class="guess-info">
-              <text class="guess-title">{{ b.title }}</text>
-              <text class="guess-author">{{ b.author }}</text>
+            <view class="guess-card-body">
+              <text class="guess-card-title">{{ b.title }}</text>
+              <text class="guess-card-author">{{ b.author }}</text>
+              <text class="guess-card-summary">{{ b.summary }}</text>
+              <view class="guess-card-footer">
+                <text class="guess-card-status" :class="b.status">{{ b.status === 'ongoing' ? '连载中' : '已完结' }}</text>
+              </view>
             </view>
           </view>
         </view>
@@ -195,7 +206,6 @@ const categories = ref<any[]>([
   { id: 4, name: '历史' },
   { id: 5, name: '悬疑' },
   { id: 6, name: '言情' },
-  { id: 999, name: '更多' },
 ]);
 const todayPick = ref<Partial<Book>>({});
 const hotRank = ref<RankItem[]>([]);
@@ -207,10 +217,15 @@ const firstLoad = ref(true);
 
 const enrichBook = (b: any) => ({ ...b, coverColor: COVERS[(b.id || 0) % COVERS.length] });
 
-const filteredRank = computed(() => {
-  if (activeCategory.value === 0) return hotRank.value.slice(0, 5);
-  const catName = categories.value.find(c => c.id === activeCategory.value)?.name || '';
-  return hotRank.value.filter(item => item.category === catName).slice(0, 5);
+const rankTabs = computed(() => categories.value);
+
+const activeRankTabIndex = computed(() => rankTabs.value.findIndex(c => c.id === activeCategory.value));
+
+const rankItemsByTab = computed(() => {
+  return rankTabs.value.map(tab => {
+    if (tab.id === 0) return hotRank.value.slice(0, 5);
+    return hotRank.value.filter(item => item.category === tab.name).slice(0, 5);
+  });
 });
 
 const displayedGuessLike = computed(() => {
@@ -219,11 +234,14 @@ const displayedGuessLike = computed(() => {
 });
 
 function selectCategory(c: any) {
-  if (c.id === 999 || c.name === '更多') {
-    goCategory(c);
-    return;
-  }
   activeCategory.value = c.id;
+}
+
+function onRankSwiperChange(e: any) {
+  const idx = e.detail.current;
+  if (rankTabs.value[idx]) {
+    activeCategory.value = rankTabs.value[idx].id;
+  }
 }
 
 function shuffleGuessLike() {
@@ -254,7 +272,7 @@ async function loadData() {
       fetchGuessLike().catch(() => []),
     ]);
     banners.value = b;
-    if (c.length) categories.value = [{ id: 0, name: '全部' }, ...c, { id: 999, name: '更多' }];
+    if (c.length) categories.value = [{ id: 0, name: '全部' }, ...c];
     todayPick.value = enrichBook((t || [])[0] || {});
     hotRank.value = (r || []).slice(0, 5).map(enrichBook);
     guessLike.value = (g || []).slice(0, 6).map(enrichBook);
@@ -280,8 +298,8 @@ function goCategory(c: any) {
   uni.navigateTo({ url: `/pages/category/category?id=${c.id}&name=${encodeURIComponent(c.name)}` });
 }
 
-function goMore(type: string) {
-  uni.navigateTo({ url: `/pages/more/more?type=${type}` });
+function goStore() {
+  uni.switchTab({ url: '/pages/store/store' });
 }
 </script>
 
@@ -633,12 +651,25 @@ function goMore(type: string) {
 }
 
 /* 热门榜单 */
+.rank-swiper {
+  height: 800rpx;
+}
 .rank-list {
   background: #FFFFFF;
   border-radius: 24rpx;
   padding: 16rpx 24rpx;
   box-shadow: 0 4rpx 24rpx rgba(163, 74, 46, 0.04);
   border: 1rpx solid rgba(163, 74, 46, 0.06);
+}
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(30rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .rank-item {
   display: flex;
@@ -713,19 +744,37 @@ function goMore(type: string) {
   font-weight: 600;
   font-family: 'Noto Serif SC', serif;
 }
+.rank-empty {
+  padding: 48rpx 0;
+  text-align: center;
+}
+.rank-empty text {
+  font-size: 26rpx;
+  color: #AAAAAA;
+  font-family: 'Noto Sans SC', sans-serif;
+}
 
 /* 分类标签 - 横向滚动 */
 .category-scroll {
   margin-bottom: 20rpx;
-  white-space: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.category-scroll::-webkit-scrollbar {
+  display: none;
 }
 .category-list {
-  display: flex;
+  display: inline-flex;
   gap: 16rpx;
   padding: 0 4rpx;
   white-space: nowrap;
+  min-width: 100%;
 }
 .category-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 12rpx 28rpx;
   border-radius: 48rpx;
   background: #FFFFFF;
@@ -733,17 +782,16 @@ function goMore(type: string) {
   box-shadow: 0 2rpx 8rpx rgba(163, 74, 46, 0.04);
   flex-shrink: 0;
   transition: all 0.2s ease;
+  font-size: 26rpx;
+  color: #1C1C19;
+  font-family: 'Noto Sans SC', sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .category-tag.active {
   background: #A34A2E;
   border-color: #A34A2E;
-}
-.category-tag text {
-  font-size: 26rpx;
-  color: #1C1C19;
-  font-family: 'Noto Sans SC', sans-serif;
-}
-.category-tag.active text {
   color: #FFFFFF;
 }
 
@@ -752,48 +800,50 @@ function goMore(type: string) {
   width: 24rpx;
   height: 24rpx;
 }
-.guess-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.guess-list {
+  display: flex;
+  flex-direction: column;
   gap: 20rpx;
 }
-.guess-item {
+.guess-card {
+  display: flex;
+  gap: 20rpx;
   background: #FFFFFF;
   border-radius: 20rpx;
   padding: 20rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
   box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
   border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
-.guess-cover {
-  width: 100%;
-  aspect-ratio: 3 / 4;
+.guess-card-cover {
+  width: 140rpx;
+  aspect-ratio: 2 / 3;
   border-radius: 12rpx;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: #F1EDE9;
 }
-.guess-cover-img {
+.guess-card-cover-img {
   width: 100%;
   height: 100%;
 }
-.guess-cover-text {
+.guess-card-cover-text {
   font-size: 48rpx;
   color: #fff;
   font-weight: 700;
   font-family: 'Noto Serif SC', serif;
 }
-.guess-info {
+.guess-card-body {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  gap: 8rpx;
   overflow: hidden;
+  min-width: 0;
 }
-.guess-title {
+.guess-card-title {
   font-size: 28rpx;
   font-weight: 600;
   color: #1C1C19;
@@ -802,9 +852,39 @@ function goMore(type: string) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.guess-author {
+.guess-card-author {
   font-size: 22rpx;
   color: #55423D;
   font-family: 'Noto Sans SC', sans-serif;
+}
+.guess-card-summary {
+  font-size: 22rpx;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.guess-card-footer {
+  margin-top: auto;
+  padding-top: 4rpx;
+}
+.guess-card-status {
+  display: inline-block;
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.guess-card-status.ongoing {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+.guess-card-status.completed {
+  background: rgba(163, 74, 46, 0.1);
+  color: #A34A2E;
 }
 </style>

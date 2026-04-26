@@ -19,7 +19,7 @@ export function request<T = any>(url: string, method: string = 'GET', data?: any
           resolve(res.data as T)
         } else if (res.statusCode === 401 || res.statusCode === 403) {
           uni.removeStorageSync('token')
-          uni.navigateTo({ url: '/pages/me/me' })
+          uni.switchTab({ url: '/pages/me/me' })
           reject(new Error('Unauthorized'))
         } else {
           reject(new Error(`HTTP ${res.statusCode}`))

@@ -49,6 +49,9 @@ public class Book {
     @OneToMany(mappedBy = "book", cascade = CascadeType.ALL)
     private List<BookShelf> shelves;
 
+    @jakarta.persistence.Transient
+    private Integer chapterCount;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -99,4 +102,7 @@ public class Book {
 
     public List<BookShelf> getShelves() { return shelves; }
     public void setShelves(List<BookShelf> shelves) { this.shelves = shelves; }
+
+    public Integer getChapterCount() { return chapterCount; }
+    public void setChapterCount(Integer chapterCount) { this.chapterCount = chapterCount; }
 }

@@ -34,7 +34,7 @@
       <!-- Header -->
       <view class="header">
         <text class="header-label">书架</text>
-        <text class="header-num">003</text>
+        <text class="header-num">{{ String(records.length).padStart(3, '0') }}</text>
       </view>
 
       <!-- 最近在读 -->
@@ -46,6 +46,11 @@
         <view class="recent-info">
           <text class="recent-title">{{ recentBook.title }}</text>
           <text class="recent-author">{{ recentBook.author }}</text>
+          <view class="recent-meta">
+            <text class="recent-wordcount">{{ formatWordCount(recentBook.wordCount) }}字</text>
+            <text class="recent-dot">·</text>
+            <text class="recent-status" :class="recentBook.status">{{ recentBook.status === 'ongoing' ? '连载中' : '已完结' }}</text>
+          </view>
           <view class="recent-progress">
             <view class="progress-bar">
               <view class="progress-fill" :style="{ width: recentBook.progress + '%' }"></view>
@@ -89,18 +94,22 @@
             <image v-if="rec.cover" class="book-cover-img" :src="rec.cover" mode="aspectFill" />
             <text v-else class="book-cover-text">{{ rec.title?.charAt(0) }}</text>
           </view>
-          <view class="book-info">
-            <text class="book-title">{{ rec.title }}</text>
-            <text class="book-author">{{ rec.author }}</text>
-            <view class="book-progress" v-if="rec.progress > 0">
+          <view class="book-body">
+            <view class="book-main">
+              <text class="book-title">{{ rec.title }}</text>
+              <text class="book-author">{{ rec.author }}</text>
+              <view class="book-tags">
+                <text class="book-tag category">{{ rec.category }}</text>
+                <text class="book-tag wordcount">{{ formatWordCount(rec.wordCount) }}字</text>
+                <text class="book-tag status" :class="rec.status">{{ rec.status === 'ongoing' ? '连载中' : '已完结' }}</text>
+              </view>
+            </view>
+            <view class="book-progress-wrap">
               <view class="progress-bar-sm">
                 <view class="progress-fill-sm" :style="{ width: rec.progress + '%' }"></view>
               </view>
               <text class="progress-text-sm">{{ rec.progress }}%</text>
             </view>
-          </view>
-          <view class="book-status-badge" :class="rec.readStatus">
-            <text>{{ rec.readStatus === 'finished' ? '读完' : '在读' }}</text>
           </view>
         </view>
       </view>
@@ -125,14 +134,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { COVERS } from '@/utils/constants';
-import { fetchShelf, type Book, type ShelfItem } from '@/api/book';
+import { fetchShelf, type ShelfItem } from '@/api/book';
 import Folio from '@/components/Folio.vue';
 import CustomTabBar from '@/components/CustomTabBar.vue';
 
 interface ExtendedShelfItem extends ShelfItem {
   coverColor?: string;
-  progress?: number;
-  readStatus?: string;
 }
 
 const records = ref<ExtendedShelfItem[]>([]);
@@ -158,6 +165,12 @@ const filteredRecords = computed(() => {
   return records.value.filter(r => r.readStatus === activeTab.value);
 });
 
+function formatWordCount(n?: number): string {
+  if (!n) return '0';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return String(n);
+}
+
 onMounted(() => {
   isLoading.value = firstLoad.value;
   loadShelf();
@@ -176,8 +189,6 @@ async function loadShelf() {
     records.value = items.map((item: any) => ({
       ...item,
       coverColor: COVERS[(item.bookId || 0) % COVERS.length],
-      progress: item.progress || Math.floor(Math.random() * 80) + 10,
-      readStatus: item.progress && item.progress >= 100 ? 'finished' : 'reading',
     }));
   } catch (e) {
     console.error('fetch shelf failed', e);
@@ -350,17 +361,46 @@ function goDetail(id: number) {
   flex-direction: column;
   gap: 8rpx;
   overflow: hidden;
+  min-width: 0;
 }
 .recent-title {
   font-size: 32rpx;
   font-weight: 600;
   color: #1C1C19;
   font-family: 'Noto Serif SC', serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .recent-author {
   font-size: 24rpx;
   color: #55423D;
   font-family: 'Noto Sans SC', sans-serif;
+}
+.recent-meta {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 4rpx;
+}
+.recent-wordcount {
+  font-size: 22rpx;
+  color: #645D55;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.recent-dot {
+  font-size: 22rpx;
+  color: #CCCCCC;
+}
+.recent-status {
+  font-size: 22rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.recent-status.ongoing {
+  color: #4CAF50;
+}
+.recent-status.completed {
+  color: #A34A2E;
 }
 .recent-progress {
   margin-top: 8rpx;
@@ -456,17 +496,17 @@ function goDetail(id: number) {
 .book-row {
   display: flex;
   gap: 20rpx;
-  padding: 16rpx 0;
-  border-bottom: 1rpx solid #F5F0EA;
-  align-items: center;
-}
-.book-row:last-child {
-  border-bottom: none;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  border: 1rpx solid rgba(163, 74, 46, 0.06);
 }
 .book-cover {
-  width: 100rpx;
+  width: 120rpx;
   aspect-ratio: 2 / 3;
-  border-radius: 8rpx;
+  border-radius: 12rpx;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -478,21 +518,28 @@ function goDetail(id: number) {
   height: 100%;
 }
 .book-cover-text {
-  font-size: 32rpx;
+  font-size: 40rpx;
   color: #fff;
   font-weight: 700;
   font-family: 'Noto Serif SC', serif;
 }
-.book-info {
+.book-body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  justify-content: space-between;
   overflow: hidden;
+  min-width: 0;
+  gap: 12rpx;
+}
+.book-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
 }
 .book-title {
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 600;
   color: #1C1C19;
   font-family: 'Noto Sans SC', sans-serif;
   overflow: hidden;
@@ -504,11 +551,39 @@ function goDetail(id: number) {
   color: #55423D;
   font-family: 'Noto Sans SC', sans-serif;
 }
-.book-progress {
+.book-tags {
   display: flex;
   align-items: center;
   gap: 12rpx;
   margin-top: 4rpx;
+  flex-wrap: wrap;
+}
+.book-tag {
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.book-tag.category {
+  background: rgba(163, 74, 46, 0.08);
+  color: #A34A2E;
+}
+.book-tag.wordcount {
+  background: #F5F0EA;
+  color: #645D55;
+}
+.book-tag.status.ongoing {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+.book-tag.status.completed {
+  background: rgba(163, 74, 46, 0.1);
+  color: #A34A2E;
+}
+.book-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 .progress-bar-sm {
   flex: 1;
@@ -525,22 +600,7 @@ function goDetail(id: number) {
   font-size: 20rpx;
   color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
-}
-.book-status-badge {
-  padding: 4rpx 16rpx;
-  border-radius: 24rpx;
-  background: #F0EBE3;
-}
-.book-status-badge.finished {
-  background: rgba(163, 74, 46, 0.08);
-}
-.book-status-badge text {
-  font-size: 20rpx;
-  color: #645D55;
-  font-family: 'Noto Sans SC', sans-serif;
-}
-.book-status-badge.finished text {
-  color: #A34A2E;
+  flex-shrink: 0;
 }
 
 /* Empty */

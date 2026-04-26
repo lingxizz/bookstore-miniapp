@@ -1,7 +1,9 @@
 package com.bookstore.bookstore.controller;
 
 import com.bookstore.bookstore.entity.Book;
+import com.bookstore.bookstore.entity.Category;
 import com.bookstore.bookstore.repository.BookRepository;
+import com.bookstore.bookstore.repository.CategoryRepository;
 import com.bookstore.bookstore.service.BookService;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,10 +17,12 @@ public class HomeController {
 
     private final BookService bookService;
     private final BookRepository bookRepository;
+    private final CategoryRepository categoryRepository;
 
-    public HomeController(BookService bookService, BookRepository bookRepository) {
+    public HomeController(BookService bookService, BookRepository bookRepository, CategoryRepository categoryRepository) {
         this.bookService = bookService;
         this.bookRepository = bookRepository;
+        this.categoryRepository = categoryRepository;
     }
 
     // 首页聚合
@@ -26,12 +30,7 @@ public class HomeController {
     public Map<String, Object> home() {
         Map<String, Object> data = new HashMap<>();
         data.put("banners", bookService.getBanners());
-        data.put("categories", bookService.getCategoryCounts().stream().map(obj -> {
-            Map<String, Object> cat = new HashMap<>();
-            cat.put("name", obj[0]);
-            cat.put("bookCount", obj[1]);
-            return cat;
-        }).toList());
+        data.put("categories", categoryRepository.findByOrderBySortOrderAsc());
         data.put("todayPick", bookService.getTodayPick());
         data.put("hotRank", bookService.getHotRank());
         data.put("guessLike", bookService.getGuessLike(null));
@@ -44,13 +43,8 @@ public class HomeController {
     }
 
     @GetMapping("/categories")
-    public List<Map<String, Object>> categories() {
-        return bookService.getCategoryCounts().stream().map(obj -> {
-            Map<String, Object> cat = new HashMap<>();
-            cat.put("name", obj[0]);
-            cat.put("bookCount", obj[1]);
-            return cat;
-        }).toList();
+    public List<Category> categories() {
+        return categoryRepository.findByOrderBySortOrderAsc();
     }
 
     @GetMapping("/books/today-pick")
@@ -71,12 +65,7 @@ public class HomeController {
     @GetMapping("/store")
     public Map<String, Object> store() {
         Map<String, Object> data = new HashMap<>();
-        data.put("categories", bookService.getCategoryCounts().stream().map(obj -> {
-            Map<String, Object> cat = new HashMap<>();
-            cat.put("name", obj[0]);
-            cat.put("bookCount", obj[1]);
-            return cat;
-        }).toList());
+        data.put("categories", categoryRepository.findByOrderBySortOrderAsc());
         data.put("newReleases", bookService.getNewReleases());
         data.put("completed", bookService.getCompletedBooks());
         data.put("bestsellers", bookService.getHotRank());

@@ -92,7 +92,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { fetchBalance, fetchShelf } from '@/api/book';
+import { fetchBalance, fetchShelf, h5Login } from '@/api/book';
 import Folio from '@/components/Folio.vue';
 import CustomTabBar from '@/components/CustomTabBar.vue';
 
@@ -116,6 +116,8 @@ const menuList = [
 
 onMounted(() => {
   isLoading.value = firstLoad.value;
+  const token = uni.getStorageSync('token');
+  if (token) user.value.isLoggedIn = true;
   loadData();
 });
 
@@ -135,13 +137,26 @@ async function loadData() {
   }
 }
 
-function handleLogin() {
-  user.value.isLoggedIn = true;
-  user.value.name = '读者' + Math.floor(Math.random() * 1000);
+async function handleLogin() {
+  try {
+    const res = await h5Login();
+    if (res.token) {
+      uni.setStorageSync('token', res.token);
+      user.value.isLoggedIn = true;
+      user.value.name = res.user?.nickname || '读者';
+      user.value.coins = res.user?.coins || 0;
+      uni.showToast({ title: '登录成功', icon: 'success' });
+      loadData();
+    }
+  } catch (e: any) {
+    uni.showToast({ title: '登录失败: ' + (e.message || ''), icon: 'none' });
+  }
 }
 function handleLogout() {
+  uni.removeStorageSync('token');
   user.value.isLoggedIn = false;
   user.value.name = '';
+  user.value.coins = 0;
 }
 function goRecharge() {
   uni.navigateTo({ url: '/pages/recharge/recharge' });

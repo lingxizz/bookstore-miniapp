@@ -11,6 +11,7 @@ export interface Book {
   price: number;
   tags: string[];
   wordCount: number;
+  chapterCount?: number;
   status: string;
   updateTime: string;
 }
@@ -31,10 +32,16 @@ export interface ShelfItem {
   title: string;
   author: string;
   cover: string;
-  lastChapter: string;
-  lastChapterId: number;
+  wordCount: number;
+  status: string;
+  category: string;
+  summary: string;
+  rating: number;
   progress: number;
+  readStatus: string;
+  lastChapterId?: number;
   updateTime: string;
+  lastReadAt?: string;
 }
 
 export interface Banner {
@@ -131,7 +138,7 @@ export function fetchCompleted(category?: string): Promise<Book[]> {
 
 // 搜索
 export function searchBooks(keyword: string): Promise<Book[]> {
-  return request(`/api/books/search?keyword=${encodeURIComponent(keyword)}`, 'GET');
+  return request(`/api/books?q=${encodeURIComponent(keyword)}`, 'GET');
 }
 
 // 书籍详情
@@ -156,17 +163,17 @@ export function fetchShelf(): Promise<ShelfItem[]> {
 
 // 检查是否在书架
 export function checkShelf(bookId: number): Promise<{ inShelf: boolean }> {
-  return request(`/api/shelf/check/${bookId}`, 'GET');
+  return request(`/api/books/${bookId}/shelf`, 'GET');
 }
 
 // 加入书架
 export function addToShelf(bookId: number) {
-  return request('/api/shelf', 'POST', { bookId });
+  return request(`/api/books/${bookId}/shelf`, 'POST');
 }
 
 // 移除书架
 export function removeFromShelf(bookId: number) {
-  return request(`/api/shelf/${bookId}`, 'DELETE');
+  return request(`/api/books/${bookId}/shelf`, 'DELETE');
 }
 
 // 阅读进度
@@ -182,6 +189,11 @@ export function saveProgress(bookId: number, chapterId: number, progress: number
 // 广告解锁
 export function unlockByAd(bookId: number, chapterId: number, adToken: string) {
   return request('/api/unlock/ad', 'POST', { bookId, chapterId, adToken });
+}
+
+// H5 登录
+export function h5Login(nickname?: string): Promise<{ token: string; user: any }> {
+  return request('/api/auth/login', 'POST', { code: 'h5_login', nickname: nickname || '读者', avatar: '' });
 }
 
 // 检查解锁状态

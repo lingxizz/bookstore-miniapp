@@ -6,7 +6,8 @@
     { "path": "pages/me/me", "style": { "navigationStyle": "custom" } },
     { "path": "pages/detail/detail", "style": { "navigationStyle": "custom" } },
     { "path": "pages/reader/reader", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/recharge/recharge", "style": { "navigationStyle": "custom" } }
+    { "path": "pages/recharge/recharge", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/search/search", "style": { "navigationStyle": "custom" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
