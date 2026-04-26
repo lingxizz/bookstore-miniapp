@@ -79,7 +79,15 @@
       <!-- Summary card -->
       <view class="summary">
         <text class="section-title">简介</text>
-        <text class="summary-text">{{ book.summary }}</text>
+        <view class="summary-body">
+          <text class="summary-text" :class="{ collapsed: !isSummaryExpanded }">{{ book.summary }}</text>
+          <view v-if="showExpandBtn" class="expand-btn" @click="isSummaryExpanded = !isSummaryExpanded">
+            <text class="expand-text">{{ isSummaryExpanded ? '收起' : '展开' }}</text>
+            <svg class="expand-icon" :class="{ up: isSummaryExpanded }" viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </view>
+        </view>
       </view>
 
       <!-- Chapters card -->
@@ -89,13 +97,23 @@
           <text class="section-sub">前{{ freeCount }}章免费</text>
         </view>
         <ChapterItem
-          v-for="ch in chapters"
+          v-for="ch in displayedChapters"
           :key="ch.id"
           :num="ch.order"
           :title="ch.title"
           :is-premium="!ch.isFree"
+          :status="getChapterStatus(ch)"
           @click="goReader(ch)"
         />
+        <view v-if="hasMoreChapters" class="load-more" @click="loadMoreChapters">
+          <text class="load-more-text">加载更多</text>
+          <svg class="load-more-icon" viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </view>
+        <view v-else-if="chapters.length > chapterPageSize" class="no-more">
+          <text>已加载全部 {{ chapters.length }} 章</text>
+        </view>
       </view>
 
       <Folio :num="5" />
@@ -195,6 +213,36 @@ const toggleShelf = async () => {
     uni.showToast({ title: '操作失败: ' + msg, icon: 'none' });
   }
 };
+
+/* ---------- 简介展开/折叠 ---------- */
+const isSummaryExpanded = ref(false);
+const showExpandBtn = computed(() => {
+  const s = book.value.summary || '';
+  return s.length > 80;
+});
+
+/* ---------- 章节分页 ---------- */
+const chapterPageSize = 20;
+const chapterPage = ref(1);
+const displayedChapters = computed(() => {
+  return chapters.value.slice(0, chapterPage.value * chapterPageSize);
+});
+const hasMoreChapters = computed(() => {
+  return chapters.value.length > chapterPage.value * chapterPageSize;
+});
+function loadMoreChapters() {
+  chapterPage.value++;
+}
+
+/* ---------- 章节状态 ---------- */
+function getChapterStatus(ch: Chapter): 'read' | 'reading' | 'locked' | 'default' {
+  if (lastChapterId.value) {
+    if (ch.id === lastChapterId.value) return 'reading';
+    if (ch.id < lastChapterId.value) return 'read';
+  }
+  if (!ch.isFree) return 'locked';
+  return 'default';
+}
 </script>
 
 <style scoped>
@@ -402,12 +450,43 @@ const toggleShelf = async () => {
   color: #1C1C19;
   margin-bottom: 16rpx;
 }
+.summary-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
 .summary-text {
   font-size: 28rpx;
   color: #645D55;
   font-family: 'Noto Serif SC', serif;
   line-height: 1.8;
   word-break: break-word;
+}
+.summary-text.collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  padding: 8rpx 0;
+}
+.expand-text {
+  font-size: 26rpx;
+  color: #A34A2E;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.expand-icon {
+  width: 24rpx;
+  height: 24rpx;
+  transition: transform 0.2s ease;
+}
+.expand-icon.up {
+  transform: rotate(180deg);
 }
 
 /* Chapters card */
@@ -427,6 +506,37 @@ const toggleShelf = async () => {
 .section-sub {
   font-size: 24rpx;
   color: #4CAF50;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* Load more */
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 24rpx 0 8rpx;
+  margin-top: 8rpx;
+  border-top: 1rpx solid #F5F0EA;
+}
+.load-more-text {
+  font-size: 26rpx;
+  color: #A34A2E;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.load-more-icon {
+  width: 24rpx;
+  height: 24rpx;
+}
+.no-more {
+  text-align: center;
+  padding: 24rpx 0 8rpx;
+  margin-top: 8rpx;
+  border-top: 1rpx solid #F5F0EA;
+}
+.no-more text {
+  font-size: 24rpx;
+  color: #AAAAAA;
   font-family: 'Noto Sans SC', sans-serif;
 }
 
