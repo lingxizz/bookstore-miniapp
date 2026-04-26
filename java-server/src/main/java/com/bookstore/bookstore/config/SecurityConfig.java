@@ -32,7 +32,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/health", "/error").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/books", "/api/books/{id}", "/api/books/{id}/chapters").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/books", "/api/books/{id}", "/api/books/{id}/chapters", "/api/books/{bookId}/chapters/{chapterId}").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/books/filter").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/banners", "/api/categories", "/api/books/today-pick", "/api/books/hot-rank", "/api/books/guess-like").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/books/new-releases", "/api/books/completed").permitAll()

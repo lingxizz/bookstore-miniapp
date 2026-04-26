@@ -153,7 +153,7 @@ export function fetchChapters(bookId: number): Promise<Chapter[]> {
 
 // 章节内容
 export function fetchChapterContent(bookId: number, chapterId: number) {
-  return request(`/api/chapters/${chapterId}`, 'GET');
+  return request(`/api/books/${bookId}/chapters/${chapterId}`, 'GET');
 }
 
 // 书架列表
