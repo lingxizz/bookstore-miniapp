@@ -20,9 +20,9 @@
       @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <!-- 下拉加载指示器 -->
-      <view v-if="pullState !== 'idle'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
-        <view class="pull-spinner" :class="{ 'pull-spinner-active': pullState === 'loading' }">
+      <!-- 下拉加载指示器（仅在 pulling 状态显示，loading 时隐藏，由 loadingPrev 替代） -->
+      <view v-if="pullState === 'pulling'" class="pull-indicator" :style="{ height: pullOffset + 'px' }">
+        <view class="pull-spinner">
           <svg class="spinner" viewBox="0 0 50 50">
             <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
           </svg>
@@ -761,9 +761,8 @@ function onTouchMove(e: any) {
     return;
   }
 
-  // 如果正在加载中，固定下拉高度
-  if (pullState.value === 'loading') {
-    pullOffset.value = 50;
+  // 如果正在加载中，忽略后续 touchmove
+  if (pullState.value === 'loading' || loadingPrev.value) {
     return;
   }
 
@@ -777,7 +776,11 @@ function onTouchMove(e: any) {
     if (pullOffset.value >= 60) {
       pullState.value = 'loading';
       pullOffset.value = 50; // 固定高度，显示加载中
-      autoLoadPrev();
+      // 立即触发加载，加载完成后重置状态
+      autoLoadPrev().then(() => {
+        pullState.value = 'idle';
+        pullOffset.value = 0;
+      });
     } else {
       pullState.value = 'pulling';
     }
@@ -866,7 +869,9 @@ async function autoLoadNext() {
 async function autoLoadPrev() {
   const prevCh = getPrevChapter();
   if (!prevCh) return;
+  // 严格防重入：已加载或正在加载都直接返回
   if (sections.value.some(s => s.chapterId === prevCh.id)) return;
+  if (loadingPrev.value) return;
   if (!prevCh.isFree && !isUnlocked(prevCh.id)) return;
 
   loadingPrev.value = true;
