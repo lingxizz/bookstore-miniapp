@@ -18,13 +18,12 @@
       <!-- 顶部哨兵：用于检测滚动到顶部时加载上一章 -->
       <view id="top-sentinel" style="height: 1px;" />
 
-      <!-- 上一章加载骨架屏 -->
-      <view v-if="loadingPrev" class="loading-skeleton">
-        <view class="sk-line w70" />
-        <view class="sk-line w50" />
-        <view class="sk-line w90" />
-        <view class="sk-line w40" />
-        <view class="sk-line w80" />
+      <!-- 上一章加载中 -->
+      <view v-if="loadingPrev" class="loading-spinner">
+        <svg class="spinner" viewBox="0 0 50 50">
+          <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
+        </svg>
+        <text>加载中</text>
       </view>
 
       <view
@@ -44,13 +43,12 @@
         </view>
       </view>
 
-      <!-- 下一章加载骨架屏 -->
-      <view v-if="loadingNext" class="loading-skeleton">
-        <view class="sk-line w75" />
-        <view class="sk-line w55" />
-        <view class="sk-line w85" />
-        <view class="sk-line w45" />
-        <view class="sk-line w80" />
+      <!-- 下一章加载中 -->
+      <view v-if="loadingNext" class="loading-spinner">
+        <svg class="spinner" viewBox="0 0 50 50">
+          <circle cx="25" cy="25" r="20" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-dasharray="30, 200" />
+        </svg>
+        <text>加载中</text>
       </view>
 
       <!-- 底部哨兵：用于检测滚动到底部时加载下一章 -->
@@ -294,8 +292,6 @@ const unlockedChapters = ref<number[]>([]);
 let bottomObserver: IntersectionObserver | null = null;
 let topObserver: IntersectionObserver | null = null;
 let scrollEl: HTMLElement | null = null;
-let lastScrollTop = 0;
-let hasUserScrolledUp = false;
 
 // 阅读配置
 const config = ref({
@@ -462,9 +458,6 @@ async function loadCurrentChapter() {
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
-    // 重置向上滚动标志，防止刚进入就自动加载上一章
-    hasUserScrolledUp = false;
-    lastScrollTop = 0;
     await nextTick();
     setupObservers();
     await checkAndLoadMore();
@@ -494,16 +487,11 @@ function getScrollEl() {
   return scrollEl;
 }
 
-// 滚动监听（备用）
+// 滚动监听
 function onScrollHandler() {
   const el = getScrollEl();
   if (!el) return;
-  const st = el.scrollTop;
-  if (st < lastScrollTop) {
-    hasUserScrolledUp = true;
-  }
-  lastScrollTop = st;
-  currentScrollTop.value = st;
+  currentScrollTop.value = el.scrollTop;
 }
 
 // IntersectionObserver 设置
@@ -573,6 +561,15 @@ function onTouchEnd(e: any) {
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
 
+  // 下拉加载上一章：在顶部向下拉（dy > 60）
+  if (dy > 60 && Math.abs(dx) < 40 && dt < 600) {
+    const el = getScrollEl();
+    if (el && el.scrollTop <= 2) {
+      autoLoadPrev();
+      return;
+    }
+  }
+
   // 移动距离大或时间长 = 滑动，不是点击
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
 
@@ -627,7 +624,6 @@ async function autoLoadNext() {
 }
 
 async function autoLoadPrev() {
-  if (!hasUserScrolledUp) return;
   const prevCh = getPrevChapter();
   if (!prevCh) return;
   if (sections.value.some(s => s.chapterId === prevCh.id)) return;
@@ -1018,41 +1014,26 @@ async function buyChapter() {
   width: 30%;
 }
 
-/* 骨架屏加载 */
-.loading-skeleton {
+/* 加载中 spinner */
+.loading-spinner {
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  align-items: center;
+  gap: 12rpx;
   padding: 32rpx 0;
-  animation: fadeIn 0.3s ease;
 }
-.sk-line {
-  height: 28rpx;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  border-radius: 6rpx;
-  animation: shimmer 1.5s infinite;
+.loading-spinner text {
+  font-size: 24rpx;
+  color: #AAAAAA;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.dark-mode .sk-line {
-  background: linear-gradient(90deg, #333344 25%, #444455 50%, #333344 75%);
-  background-size: 200% 100%;
+.spinner {
+  width: 40rpx;
+  height: 40rpx;
+  animation: rotate 1.5s linear infinite;
 }
-.sk-line.w70 { width: 70%; }
-.sk-line.w50 { width: 50%; }
-.sk-line.w90 { width: 90%; }
-.sk-line.w40 { width: 40%; }
-.sk-line.w75 { width: 75%; }
-.sk-line.w55 { width: 55%; }
-.sk-line.w85 { width: 85%; }
-.sk-line.w45 { width: 45%; }
-.sk-line.w80 { width: 80%; }
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
 }
 
 /* 底部设置面板 */
