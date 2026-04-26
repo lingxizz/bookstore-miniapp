@@ -11,13 +11,20 @@
     <view
       id="reader-content"
       class="content-scroll"
-      @scroll="onContentScroll"
       @touchstart="onTouchStart"
       @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <view v-if="loadingPrev" class="loading-bar">
-        <text>正在加载上一章...</text>
+      <!-- 顶部哨兵：用于检测滚动到顶部时加载上一章 -->
+      <view id="top-sentinel" style="height: 1px;" />
+
+      <!-- 上一章加载骨架屏 -->
+      <view v-if="loadingPrev" class="loading-skeleton">
+        <view class="sk-line w70" />
+        <view class="sk-line w50" />
+        <view class="sk-line w90" />
+        <view class="sk-line w40" />
+        <view class="sk-line w80" />
       </view>
 
       <view
@@ -37,9 +44,17 @@
         </view>
       </view>
 
-      <view v-if="loadingNext" class="loading-bar">
-        <text>正在加载下一章...</text>
+      <!-- 下一章加载骨架屏 -->
+      <view v-if="loadingNext" class="loading-skeleton">
+        <view class="sk-line w75" />
+        <view class="sk-line w55" />
+        <view class="sk-line w85" />
+        <view class="sk-line w45" />
+        <view class="sk-line w80" />
       </view>
+
+      <!-- 底部哨兵：用于检测滚动到底部时加载下一章 -->
+      <view id="bottom-sentinel" style="height: 1px;" />
 
       <view style="height: 200rpx" />
     </view>
@@ -84,129 +99,157 @@
       </view>
     </view>
 
-    <!-- 全屏设置面板 -->
-    <view class="settings-fullscreen" v-if="showSettingsPanel" @click.stop :class="{ 'dark-mode': isDark }" :style="settingsPanelStyle">
-      <view class="settings-header">
-        <text class="settings-title" :class="{ 'dark-text': isDark }">阅读设置</text>
-        <text class="settings-close-btn" :class="{ 'dark-text': isDark }" @click="showSettingsPanel = false">✕</text>
-      </view>
+    <!-- 底部设置面板 -->
+    <view class="settings-mask" v-if="showSettingsPanel" @click="showSettingsPanel = false">
+      <view class="settings-sheet" @click.stop :class="{ 'dark-mode': isDark }">
+        <view class="sheet-drag-handle" />
 
-      <view class="settings-tabs">
-        <view
-          class="settings-tab"
-          v-for="tab in settingsTabs"
-          :key="tab.key"
-          :class="{ active: activeSettingsTab === tab.key, 'dark-mode': isDark }"
-          @click="activeSettingsTab = tab.key"
-        >
-          <text :class="{ 'dark-text': isDark }">{{ tab.label }}</text>
+        <view class="settings-header">
+          <text class="settings-title" :class="{ 'dark-text': isDark }">阅读设置</text>
+          <text class="settings-close-btn" :class="{ 'dark-text': isDark }" @click="showSettingsPanel = false">✕</text>
         </view>
-      </view>
 
-      <scroll-view class="settings-body-scroll" scroll-y>
-        <!-- 显示 Tab -->
-        <view v-if="activeSettingsTab === 'display'" class="settings-body">
-          <view class="setting-group">
-            <text class="setting-group-title">字号大小</text>
-            <view class="font-size-control">
-              <text class="size-btn" @click="adjustFontSize(-1)">A-</text>
-              <text class="size-value">{{ config.fontSize }}</text>
-              <text class="size-btn" @click="adjustFontSize(1)">A+</text>
-            </view>
-          </view>
-
-          <view class="setting-group">
-            <text class="setting-group-title">行距</text>
-            <view class="btn-group">
-              <text
-                v-for="h in lineHeightOptions"
-                :key="h"
-                class="group-btn"
-                :class="{ active: config.lineHeight === h }"
-                @click="setLineHeight(h)"
-              >{{ h === 140 ? '紧凑' : h === 160 ? '标准' : h === 180 ? '宽松' : '极宽' }}</text>
-            </view>
-          </view>
-
-          <view class="setting-group">
-            <text class="setting-group-title">段距</text>
-            <view class="btn-group">
-              <text
-                v-for="s in paragraphSpacingOptions"
-                :key="s"
-                class="group-btn"
-                :class="{ active: config.paragraphSpacing === s }"
-                @click="setParagraphSpacing(s)"
-              >{{ s }}rpx</text>
-            </view>
-          </view>
-
-          <view class="setting-group">
-            <text class="setting-group-title">字体</text>
-            <view class="btn-group">
-              <text
-                v-for="f in fontFamilyOptions"
-                :key="f.value"
-                class="group-btn"
-                :class="{ active: config.fontFamily === f.value }"
-                @click="setFontFamily(f.value)"
-              >{{ f.label }}</text>
-            </view>
+        <view class="settings-tabs">
+          <view
+            class="settings-tab"
+            v-for="tab in settingsTabs"
+            :key="tab.key"
+            :class="{ active: activeSettingsTab === tab.key, 'dark-mode': isDark }"
+            @click="activeSettingsTab = tab.key"
+          >
+            <text :class="{ 'dark-text': isDark }">{{ tab.label }}</text>
           </view>
         </view>
 
-        <!-- 主题 Tab -->
-        <view v-if="activeSettingsTab === 'theme'" class="settings-body">
-          <view class="setting-group">
-            <text class="setting-group-title">背景主题</text>
-            <view class="theme-options">
-              <view
-                class="theme-option"
-                v-for="t in themeOptions"
-                :key="t.key"
-                :class="{ active: config.theme === t.key }"
-                :style="{ background: t.bg }"
-                @click="setTheme(t.key)"
-              >
-                <text :style="{ color: t.text }">{{ t.label }}</text>
+        <scroll-view class="settings-body-scroll" scroll-y>
+          <!-- 显示 Tab -->
+          <view v-if="activeSettingsTab === 'display'" class="settings-body">
+            <view class="setting-card">
+              <view class="setting-card-header">
+                <text class="setting-card-title" :class="{ 'dark-text': isDark }">字号大小</text>
+                <text class="setting-card-value" :class="{ 'dark-text': isDark }">{{ config.fontSize }}</text>
+              </view>
+              <view class="slider-row">
+                <text class="slider-btn" :class="{ 'dark-text': isDark }" @click="adjustFontSize(-1)">A-</text>
+                <view class="slider-track">
+                  <view class="slider-fill" :style="{ width: ((config.fontSize - 14) / 10 * 100) + '%' }" />
+                </view>
+                <text class="slider-btn" :class="{ 'dark-text': isDark }" @click="adjustFontSize(1)">A+</text>
+              </view>
+            </view>
+
+            <view class="setting-card">
+              <text class="setting-card-title" :class="{ 'dark-text': isDark }">行距</text>
+              <view class="btn-group">
+                <text
+                  v-for="h in lineHeightOptions"
+                  :key="h"
+                  class="group-btn"
+                  :class="{ active: config.lineHeight === h, 'dark-mode': isDark }"
+                  @click="setLineHeight(h)"
+                >{{ h === 140 ? '紧凑' : h === 160 ? '标准' : h === 180 ? '宽松' : '极宽' }}</text>
+              </view>
+            </view>
+
+            <view class="setting-card">
+              <text class="setting-card-title" :class="{ 'dark-text': isDark }">段距</text>
+              <view class="btn-group">
+                <text
+                  v-for="s in paragraphSpacingOptions"
+                  :key="s"
+                  class="group-btn"
+                  :class="{ active: config.paragraphSpacing === s, 'dark-mode': isDark }"
+                  @click="setParagraphSpacing(s)"
+                >{{ s }}rpx</text>
+              </view>
+            </view>
+
+            <view class="setting-card">
+              <text class="setting-card-title" :class="{ 'dark-text': isDark }">字体</text>
+              <view class="btn-group">
+                <text
+                  v-for="f in fontFamilyOptions"
+                  :key="f.value"
+                  class="group-btn"
+                  :class="{ active: config.fontFamily === f.value, 'dark-mode': isDark }"
+                  @click="setFontFamily(f.value)"
+                >{{ f.label }}</text>
               </view>
             </view>
           </view>
 
-          <view class="setting-group">
-            <text class="setting-group-title">屏幕亮度 {{ config.brightness }}%</text>
-            <view class="brightness-control">
-              <text class="brightness-btn" @click="adjustBrightness(-10)">-</text>
-              <view class="brightness-bar">
-                <view class="brightness-fill" :style="{ width: config.brightness + '%' }" />
+          <!-- 主题 Tab -->
+          <view v-if="activeSettingsTab === 'theme'" class="settings-body">
+            <view class="setting-card">
+              <text class="setting-card-title" :class="{ 'dark-text': isDark }">背景主题</text>
+              <view class="theme-grid">
+                <view
+                  class="theme-grid-item"
+                  v-for="t in themeOptions"
+                  :key="t.key"
+                  :class="{ active: config.theme === t.key }"
+                  :style="{ background: t.bg }"
+                  @click="setTheme(t.key)"
+                >
+                  <text :style="{ color: t.text }">{{ t.label }}</text>
+                  <view v-if="config.theme === t.key" class="theme-check">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </view>
+                </view>
               </view>
-              <text class="brightness-btn" @click="adjustBrightness(10)">+</text>
             </view>
-          </view>
-        </view>
 
-        <!-- 翻页 Tab -->
-        <view v-if="activeSettingsTab === 'paging'" class="settings-body">
-          <view class="setting-group">
-            <text class="setting-group-title">翻页方式</text>
-            <view class="btn-group">
-              <text
-                class="group-btn"
-                :class="{ active: config.pagingMode === 'scroll' }"
-                @click="setPagingMode('scroll')"
-              >滚动阅读</text>
-              <text
-                class="group-btn"
-                :class="{ active: config.pagingMode === 'tap' }"
-                @click="setPagingMode('tap')"
-              >点击翻页</text>
+            <view class="setting-card">
+              <view class="setting-card-header">
+                <text class="setting-card-title" :class="{ 'dark-text': isDark }">屏幕亮度</text>
+                <text class="setting-card-value" :class="{ 'dark-text': isDark }">{{ config.brightness }}%</text>
+              </view>
+              <view class="slider-row">
+                <text class="slider-btn" :class="{ 'dark-text': isDark }" @click="adjustBrightness(-10)">-</text>
+                <view class="slider-track">
+                  <view class="slider-fill" :style="{ width: ((config.brightness - 50) / 100 * 100) + '%' }" />
+                </view>
+                <text class="slider-btn" :class="{ 'dark-text': isDark }" @click="adjustBrightness(10)">+</text>
+              </view>
             </view>
           </view>
-          <view class="setting-hint" v-if="config.pagingMode === 'tap'">
-            <text>点击屏幕左侧翻上页，右侧翻下页，中间呼出菜单</text>
+
+          <!-- 翻页 Tab -->
+          <view v-if="activeSettingsTab === 'paging'" class="settings-body">
+            <view class="setting-card">
+              <text class="setting-card-title" :class="{ 'dark-text': isDark }">翻页方式</text>
+              <view class="paging-options">
+                <view
+                  class="paging-option"
+                  :class="{ active: config.pagingMode === 'scroll', 'dark-mode': isDark }"
+                  @click="setPagingMode('scroll')"
+                >
+                  <text class="paging-icon">↕</text>
+                  <view class="paging-info">
+                    <text class="paging-title" :class="{ 'dark-text': isDark }">滚动阅读</text>
+                    <text class="paging-desc" :class="{ 'dark-text': isDark }">上下滑动连续阅读</text>
+                  </view>
+                  <view v-if="config.pagingMode === 'scroll'" class="paging-check" />
+                </view>
+                <view
+                  class="paging-option"
+                  :class="{ active: config.pagingMode === 'tap', 'dark-mode': isDark }"
+                  @click="setPagingMode('tap')"
+                >
+                  <text class="paging-icon">⇦⇨</text>
+                  <view class="paging-info">
+                    <text class="paging-title" :class="{ 'dark-text': isDark }">点击翻页</text>
+                    <text class="paging-desc" :class="{ 'dark-text': isDark }">点击左右两侧翻页</text>
+                  </view>
+                  <view v-if="config.pagingMode === 'tap'" class="paging-check" />
+                </view>
+              </view>
+            </view>
           </view>
-        </view>
-      </scroll-view>
+        </scroll-view>
+      </view>
     </view>
 
     <!-- 广告解锁弹窗 -->
@@ -227,7 +270,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { fetchChapters, fetchChapterContent, saveProgress, checkUnlock, unlockByAd, buyChapter as apiBuyChapter, type Chapter } from '@/api/book';
 import { fetchReaderConfig, saveReaderConfig } from '@/api/user';
@@ -246,6 +289,11 @@ const showAdUnlock = ref(false);
 const currentScrollTop = ref(0);
 const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
+
+// IntersectionObserver
+let bottomObserver: IntersectionObserver | null = null;
+let topObserver: IntersectionObserver | null = null;
+let scrollEl: HTMLElement | null = null;
 
 // 阅读配置
 const config = ref({
@@ -412,6 +460,8 @@ async function loadCurrentChapter() {
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
     saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
+    await nextTick();
+    setupObservers();
     await checkAndLoadMore();
   } catch (e) {
     console.error('load content failed', e);
@@ -435,28 +485,67 @@ function getPrevChapter() {
 }
 
 function getScrollEl() {
-  return document.getElementById('reader-content');
+  if (!scrollEl) scrollEl = document.getElementById('reader-content') as HTMLElement;
+  return scrollEl;
 }
 
-function onContentScroll(e: any) {
-  const el = e.target;
+// 滚动监听（备用）
+function onScrollHandler() {
+  const el = getScrollEl();
+  if (!el) return;
   currentScrollTop.value = el.scrollTop;
+}
 
-  if (config.value.pagingMode !== 'scroll') return;
+// IntersectionObserver 设置
+function setupObservers() {
+  const root = getScrollEl();
+  if (!root) return;
 
-  // 接近底部，自动加载下一章
-  if (!loadingNext.value) {
-    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceToBottom < 500) {
-      autoLoadNext();
-    }
+  // 监听底部哨兵，提前 300px 触发
+  const bottomSentinel = document.getElementById('bottom-sentinel');
+  if (bottomSentinel) {
+    if (bottomObserver) bottomObserver.disconnect();
+    bottomObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !loadingNext.value) {
+          autoLoadNext();
+        }
+      });
+    }, { root, rootMargin: '0px 0px 300px 0px', threshold: 0 });
+    bottomObserver.observe(bottomSentinel);
   }
 
-  // 接近顶部，自动加载上一章
-  if (!loadingPrev.value && el.scrollTop < 100) {
-    autoLoadPrev();
+  // 监听顶部哨兵，提前 200px 触发
+  const topSentinel = document.getElementById('top-sentinel');
+  if (topSentinel) {
+    if (topObserver) topObserver.disconnect();
+    topObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !loadingPrev.value) {
+          autoLoadPrev();
+        }
+      });
+    }, { root, rootMargin: '200px 0px 0px 0px', threshold: 0 });
+    topObserver.observe(topSentinel);
   }
 }
+
+function teardownObservers() {
+  if (bottomObserver) { bottomObserver.disconnect(); bottomObserver = null; }
+  if (topObserver) { topObserver.disconnect(); topObserver = null; }
+}
+
+onMounted(() => {
+  const el = getScrollEl();
+  if (el) el.addEventListener('scroll', onScrollHandler, { passive: true });
+  setupObservers();
+});
+
+onUnmounted(() => {
+  const el = getScrollEl();
+  if (el) el.removeEventListener('scroll', onScrollHandler);
+  teardownObservers();
+});
 
 // 触摸点击区域识别
 let touchStartX = 0;
@@ -517,6 +606,8 @@ async function autoLoadNext() {
     });
     chapterId.value = nextCh.id;
     saveProgress(bookId.value, nextCh.id, 0).catch(() => {});
+    await nextTick();
+    setupObservers();
     await checkAndLoadMore();
   } catch (e) {
     console.error('auto load next failed', e);
@@ -916,26 +1007,91 @@ async function buyChapter() {
   width: 30%;
 }
 
-/* 全屏设置面板 */
-.settings-fullscreen {
+/* 骨架屏加载 */
+.loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  padding: 32rpx 0;
+  animation: fadeIn 0.3s ease;
+}
+.sk-line {
+  height: 28rpx;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 6rpx;
+  animation: shimmer 1.5s infinite;
+}
+.dark-mode .sk-line {
+  background: linear-gradient(90deg, #333344 25%, #444455 50%, #333344 75%);
+  background-size: 200% 100%;
+}
+.sk-line.w70 { width: 70%; }
+.sk-line.w50 { width: 50%; }
+.sk-line.w90 { width: 90%; }
+.sk-line.w40 { width: 40%; }
+.sk-line.w75 { width: 75%; }
+.sk-line.w55 { width: 55%; }
+.sk-line.w85 { width: 85%; }
+.sk-line.w45 { width: 45%; }
+.sk-line.w80 { width: 80%; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 底部设置面板 */
+.settings-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
   z-index: 200;
   display: flex;
   flex-direction: column;
-  padding: 48rpx 32rpx;
+  justify-content: flex-end;
+}
+.settings-sheet {
+  background: #FFFFFF;
+  border-radius: 24rpx 24rpx 0 0;
+  max-height: 75vh;
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16rpx 32rpx 48rpx;
+  animation: slideUp 0.3s ease;
+}
+.dark-mode .settings-sheet {
+  background: #1A1A2E;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-drag-handle {
+  width: 60rpx;
+  height: 6rpx;
+  background: #CCCCCC;
+  border-radius: 3rpx;
+  margin: 0 auto 16rpx;
+}
+.dark-mode .sheet-drag-handle {
+  background: #555566;
 }
 .settings-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32rpx;
+  margin-bottom: 24rpx;
 }
 .settings-title {
-  font-size: 36rpx;
+  font-size: 32rpx;
   font-weight: 700;
   color: #2C2C2C;
   font-family: 'Noto Serif SC', serif;
@@ -955,12 +1111,7 @@ async function buyChapter() {
   display: flex;
   justify-content: center;
   gap: 16rpx;
-  margin-bottom: 32rpx;
-  border-bottom: 1rpx solid rgba(163, 74, 46, 0.15);
-  padding-bottom: 16rpx;
-}
-.dark-mode .settings-tabs {
-  border-bottom-color: rgba(255,255,255,0.1);
+  margin-bottom: 24rpx;
 }
 .settings-tab {
   padding: 12rpx 32rpx;
@@ -993,46 +1144,74 @@ async function buyChapter() {
 .settings-body {
   display: flex;
   flex-direction: column;
-  gap: 32rpx;
+  gap: 20rpx;
   padding-bottom: 40rpx;
 }
-.setting-group-title {
-  font-size: 26rpx;
-  color: #645D55;
-  font-family: 'Noto Sans SC', sans-serif;
+
+/* 设置卡片 */
+.setting-card {
+  background: #F8F4F0;
+  border-radius: 20rpx;
+  padding: 24rpx;
+}
+.dark-mode .setting-card {
+  background: rgba(255,255,255,0.06);
+}
+.setting-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16rpx;
-  display: block;
 }
-.dark-mode .setting-group-title {
-  color: #AAAAAA;
+.setting-card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2C2C2C;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.font-size-control {
+.setting-card-title.dark-text {
+  color: #EEEEEE;
+}
+.setting-card-value {
+  font-size: 26rpx;
+  color: #A34A2E;
+  font-weight: 600;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* Slider */
+.slider-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 32rpx;
+  gap: 20rpx;
 }
-.size-btn {
-  font-size: 32rpx;
+.slider-btn {
+  font-size: 28rpx;
   color: #2C2C2C;
-  padding: 12rpx 24rpx;
-  background: rgba(163, 74, 46, 0.08);
-  border-radius: 12rpx;
+  padding: 8rpx 16rpx;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.dark-mode .size-btn {
-  color: #EEEEEE;
-  background: rgba(255,255,255,0.1);
-}
-.size-value {
-  font-size: 36rpx;
-  color: #2C2C2C;
-  font-weight: 600;
-  min-width: 80rpx;
-  text-align: center;
-}
-.dark-mode .size-value {
+.slider-btn.dark-text {
   color: #EEEEEE;
 }
+.slider-track {
+  flex: 1;
+  height: 8rpx;
+  background: #E8E2D8;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+.dark-mode .slider-track {
+  background: rgba(255,255,255,0.15);
+}
+.slider-fill {
+  height: 100%;
+  background: #A34A2E;
+  border-radius: 4rpx;
+  transition: width 0.2s ease;
+}
+
+/* 按钮组 */
 .btn-group {
   display: flex;
   gap: 12rpx;
@@ -1041,89 +1220,112 @@ async function buyChapter() {
 .group-btn {
   padding: 12rpx 28rpx;
   border-radius: 48rpx;
-  background: rgba(163, 74, 46, 0.08);
+  background: #FFFFFF;
+  border: 1rpx solid #E8E2D8;
   font-size: 26rpx;
   color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
 }
 .dark-mode .group-btn {
-  background: rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.1);
   color: #CCCCCC;
 }
 .group-btn.active {
   background: #A34A2E;
+  border-color: #A34A2E;
   color: #FFFFFF;
 }
 .dark-mode .group-btn.active {
   background: rgba(163, 74, 46, 0.9);
 }
-.theme-options {
-  display: flex;
+
+/* 主题网格 */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 16rpx;
 }
-.theme-option {
-  width: 140rpx;
-  height: 100rpx;
+.theme-grid-item {
+  aspect-ratio: 1;
   border-radius: 16rpx;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 8rpx;
   border: 2rpx solid transparent;
+  position: relative;
 }
-.theme-option.active {
+.theme-grid-item.active {
   border-color: #A34A2E;
 }
-.theme-option text {
-  font-size: 24rpx;
+.theme-grid-item text {
+  font-size: 22rpx;
   font-family: 'Noto Sans SC', sans-serif;
 }
-.brightness-control {
+.theme-check {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  width: 24rpx;
+  height: 24rpx;
+}
+
+/* 翻页选项 */
+.paging-options {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 16rpx;
 }
-.brightness-btn {
-  font-size: 32rpx;
-  color: #2C2C2C;
-  padding: 8rpx 16rpx;
-  background: rgba(163, 74, 46, 0.08);
-  border-radius: 12rpx;
+.paging-option {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: #FFFFFF;
+  border: 2rpx solid #E8E2D8;
 }
-.dark-mode .brightness-btn {
-  color: #EEEEEE;
-  background: rgba(255,255,255,0.1);
+.dark-mode .paging-option {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
 }
-.brightness-bar {
+.paging-option.active {
+  border-color: #A34A2E;
+  background: rgba(163, 74, 46, 0.04);
+}
+.paging-icon {
+  font-size: 40rpx;
+}
+.paging-info {
   flex: 1;
-  height: 8rpx;
-  background: rgba(163, 74, 46, 0.15);
-  border-radius: 4rpx;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
 }
-.dark-mode .brightness-bar {
-  background: rgba(255,255,255,0.2);
+.paging-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2C2C2C;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.brightness-fill {
-  height: 100%;
-  background: #A34A2E;
-  border-radius: 4rpx;
-  transition: width 0.2s ease;
+.paging-title.dark-text {
+  color: #EEEEEE;
 }
-.setting-hint {
-  padding: 16rpx;
-  background: rgba(163, 74, 46, 0.06);
-  border-radius: 12rpx;
-}
-.dark-mode .setting-hint {
-  background: rgba(255,255,255,0.05);
-}
-.setting-hint text {
+.paging-desc {
   font-size: 24rpx;
   color: #888888;
   font-family: 'Noto Sans SC', sans-serif;
 }
-.dark-mode .setting-hint text {
-  color: #888888;
+.paging-desc.dark-text {
+  color: #AAAAAA;
+}
+.paging-check {
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #A34A2E;
 }
 
 /* 广告解锁弹窗 */
