@@ -1043,7 +1043,7 @@ async function buyChapter() {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 50rpx 24rpx 20rpx;
+  padding: 36rpx 24rpx 16rpx;
   background: rgba(245, 240, 234, 0.98);
   backdrop-filter: blur(10px);
   z-index: 200;
@@ -1061,6 +1061,9 @@ async function buyChapter() {
   padding: 10rpx 28rpx;
   border-radius: 30rpx;
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
 }
 .shelf-btn.in-shelf {
   background: #999999;
