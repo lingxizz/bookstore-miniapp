@@ -1,5 +1,5 @@
 <template>
-  <view class="reader-page" :class="{ 'dark-mode': isDark }" :style="pageStyle">
+  <view class="reader-page" :class="[themeClass, { 'dark-mode': isDark }]" :style="pageStyle">
     <!-- 左上角常驻信息 -->
     <view class="reader-info" @click.stop>
       <text class="back-btn" @click="goBack">←</text>
@@ -331,6 +331,16 @@ const config = ref({
 });
 
 const isDark = computed(() => config.value.theme === 'dark');
+
+const themeClass = computed(() => {
+  const map: Record<string, string> = {
+    light: 'theme-light',
+    white: 'theme-white',
+    green: 'theme-green',
+    dark: 'theme-dark',
+  };
+  return map[config.value.theme] || 'theme-light';
+});
 
 const panelBg = computed(() => {
   const map: Record<string, string> = {
@@ -1058,6 +1068,16 @@ async function buyChapter() {
   background: rgba(26, 26, 46, 0.95);
   border-bottom-color: #333;
 }
+/* 纯白主题 */
+.reader-page.theme-white .reader-top {
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom-color: rgba(0,0,0,0.08);
+}
+/* 护眼主题 */
+.reader-page.theme-green .reader-top {
+  background: rgba(232, 245, 233, 0.98);
+  border-bottom-color: rgba(0,0,0,0.05);
+}
 .shelf-btn {
   font-size: 24rpx;
   color: #FFFFFF;
@@ -1145,6 +1165,16 @@ async function buyChapter() {
 .dark-mode .reader-bottom {
   background: rgba(26, 26, 46, 0.95);
   border-top-color: #333;
+}
+/* 纯白主题 */
+.reader-page.theme-white .reader-bottom {
+  background: rgba(255, 255, 255, 0.95);
+  border-top-color: #E8E8E8;
+}
+/* 护眼主题 */
+.reader-page.theme-green .reader-bottom {
+  background: rgba(232, 245, 233, 0.95);
+  border-top-color: #C8E6C9;
 }
 .bottom-item {
   display: flex;
