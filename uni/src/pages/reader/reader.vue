@@ -1722,7 +1722,7 @@ async function buyChapter() {
 .setting-card {
   background: #F8F4F0;
   border-radius: 20rpx;
-  padding: 24rpx;
+  padding: 28rpx;
 }
 .dark-mode .setting-card {
   background: rgba(255,255,255,0.06);
@@ -1731,13 +1731,15 @@ async function buyChapter() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16rpx;
+  margin-bottom: 20rpx;
 }
 .setting-card-title {
   font-size: 28rpx;
   font-weight: 600;
   color: #2C2C2C;
   font-family: 'Noto Sans SC', sans-serif;
+  display: block;
+  margin-bottom: 20rpx;
 }
 .setting-card-title.dark-text {
   color: #EEEEEE;
