@@ -139,7 +139,12 @@
           >
             <text class="catalog-num">{{ ch.order }}</text>
             <text class="catalog-name">{{ ch.title }}</text>
-            <text class="catalog-lock" v-if="!ch.isFree && !isUnlocked(ch.id)">🔒</text>
+            <view class="catalog-lock" v-if="!ch.isFree && !isUnlocked(ch.id)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#A34A2E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </view>
           </view>
         </scroll-view>
       </view>
@@ -1531,8 +1536,12 @@ async function buyChapter() {
   color: #CCCCCC;
 }
 .catalog-lock {
-  font-size: 24rpx;
+  width: 28rpx;
+  height: 28rpx;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 点击区域 - 不拦截滚动 */
