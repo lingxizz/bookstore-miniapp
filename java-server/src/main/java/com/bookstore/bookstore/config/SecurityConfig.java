@@ -42,6 +42,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/books/search").permitAll()
                 .requestMatchers("/api/books/{id}/progress").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/chapters/{id}", "/api/chapters/{id}/comments").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users/reader-config").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/comments/**").permitAll()
                 .requestMatchers("/api/admin/**").permitAll()
                 .anyRequest().authenticated()

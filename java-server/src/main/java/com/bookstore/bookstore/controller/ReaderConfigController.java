@@ -22,14 +22,19 @@ public class ReaderConfigController {
 
     @GetMapping("/reader-config")
     public ResponseEntity<?> getConfig(Authentication authentication) {
-        Integer userId = ((JwtAuthentication) authentication).getUserId();
-        ReaderConfig config = readerConfigService.getConfig(userId).orElse(null);
+        ReaderConfig config = null;
+        if (authentication instanceof JwtAuthentication jwtAuth) {
+            config = readerConfigService.getConfig(jwtAuth.getUserId()).orElse(null);
+        }
         if (config == null) {
             return ResponseEntity.ok(Map.of(
                 "fontSize", 18,
                 "lineHeight", 160,
                 "theme", "light",
-                "brightness", 100
+                "brightness", 100,
+                "paragraphSpacing", 24,
+                "fontFamily", "serif",
+                "pagingMode", "scroll"
             ));
         }
         return ResponseEntity.ok(config);
@@ -37,8 +42,10 @@ public class ReaderConfigController {
 
     @PostMapping("/reader-config")
     public ResponseEntity<?> saveConfig(@RequestBody ReaderConfigRequest request, Authentication authentication) {
-        Integer userId = ((JwtAuthentication) authentication).getUserId();
-        ReaderConfig config = readerConfigService.saveConfig(userId, request.getFontSize(), request.getLineHeight(), request.getTheme(), request.getBrightness());
+        if (!(authentication instanceof JwtAuthentication jwtAuth)) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        ReaderConfig config = readerConfigService.saveConfig(jwtAuth.getUserId(), request);
         return ResponseEntity.ok(config);
     }
 }

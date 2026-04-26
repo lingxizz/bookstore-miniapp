@@ -13,6 +13,9 @@ export interface ReaderConfig {
   lineHeight: number
   theme: string
   brightness: number
+  paragraphSpacing: number
+  fontFamily: string
+  pagingMode: string
 }
 
 export function login(code: string, nickname?: string, avatar?: string) {

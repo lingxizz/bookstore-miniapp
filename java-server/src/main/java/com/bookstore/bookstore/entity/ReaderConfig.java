@@ -26,6 +26,15 @@ public class ReaderConfig {
     private Integer brightness = 100;
 
     @Column(nullable = false)
+    private Integer paragraphSpacing = 24;
+
+    @Column(nullable = false)
+    private String fontFamily = "serif";
+
+    @Column(nullable = false)
+    private String pagingMode = "scroll";
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -59,6 +68,15 @@ public class ReaderConfig {
 
     public Integer getBrightness() { return brightness; }
     public void setBrightness(Integer brightness) { this.brightness = brightness; }
+
+    public Integer getParagraphSpacing() { return paragraphSpacing; }
+    public void setParagraphSpacing(Integer paragraphSpacing) { this.paragraphSpacing = paragraphSpacing; }
+
+    public String getFontFamily() { return fontFamily; }
+    public void setFontFamily(String fontFamily) { this.fontFamily = fontFamily; }
+
+    public String getPagingMode() { return pagingMode; }
+    public void setPagingMode(String pagingMode) { this.pagingMode = pagingMode; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
