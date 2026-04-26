@@ -79,17 +79,25 @@
         </view>
       </view>
 
-      <!-- Tabs -->
-      <view class="tabs">
-        <view class="tab" v-for="t in tabList" :key="t.value"
-              :class="{ active: activeTab === t.value }" @click="activeTab = t.value">
-          <text>{{ t.label }}</text>
+      <!-- Tabs + 管理按钮 -->
+      <view class="tabs-row">
+        <view class="tabs">
+          <view class="tab" v-for="t in tabList" :key="t.value"
+                :class="{ active: activeTab === t.value }" @click="activeTab = t.value">
+            <text>{{ t.label }}</text>
+          </view>
         </view>
+        <text class="manage-btn" @click="toggleManage">{{ isManaging ? '完成' : '管理' }}</text>
       </view>
 
       <!-- Book list -->
-      <view class="book-list">
-        <view class="book-row" v-for="rec in filteredRecords" :key="rec.id" @click="goDetail(rec.bookId)">
+      <view class="book-list" :class="{ 'managing': isManaging }">
+        <view class="book-row" v-for="rec in filteredRecords" :key="rec.id"
+              @click="isManaging ? toggleSelect(rec.bookId) : goDetail(rec.bookId)"
+              @longpress="onLongPress(rec.bookId)">
+          <view v-if="isManaging" class="book-select" :class="{ 'selected': selectedIds.has(rec.bookId) }">
+            <view v-if="selectedIds.has(rec.bookId)" class="select-check">✓</view>
+          </view>
           <view class="book-cover" :style="{ backgroundColor: rec.coverColor || '#A34A2E' }">
             <image v-if="rec.cover" class="book-cover-img" :src="rec.cover" mode="aspectFill" />
             <text v-else class="book-cover-text">{{ rec.title?.charAt(0) }}</text>
@@ -111,6 +119,19 @@
               <text class="progress-text-sm">{{ rec.progress }}%</text>
             </view>
           </view>
+        </view>
+      </view>
+
+      <!-- 批量删除底部栏 -->
+      <view v-if="isManaging" class="batch-bar">
+        <view class="batch-select-all" @click="toggleSelectAll">
+          <view class="book-select" :class="{ 'selected': isAllSelected }">
+            <view v-if="isAllSelected" class="select-check">✓</view>
+          </view>
+          <text>全选 ({{ selectedIds.size }})</text>
+        </view>
+        <view class="batch-delete" :class="{ 'disabled': selectedIds.size === 0 }" @click="batchRemove">
+          <text>删除</text>
         </view>
       </view>
 
@@ -146,6 +167,8 @@ const records = ref<ExtendedShelfItem[]>([]);
 const isLoading = ref(true);
 const firstLoad = ref(true);
 const activeTab = ref('all');
+const isManaging = ref(false);
+const selectedIds = ref<Set<number>>(new Set());
 const tabList = [
   { label: '全部', value: 'all' },
   { label: '在读', value: 'reading' },
@@ -154,6 +177,10 @@ const tabList = [
 
 const readingCount = computed(() => records.value.filter(r => r.readStatus === 'reading').length);
 const finishedCount = computed(() => records.value.filter(r => r.readStatus === 'finished').length);
+const isAllSelected = computed(() => {
+  const ids = filteredRecords.value.map(r => r.bookId);
+  return ids.length > 0 && ids.every(id => selectedIds.value.has(id));
+});
 
 const recentBook = computed(() => {
   if (records.value.length === 0) return undefined;
@@ -208,6 +235,61 @@ function goDetail(id: number) {
 function goReader(item: ExtendedShelfItem) {
   const chapterId = item.lastChapterId || 1;
   uni.navigateTo({ url: `/pages/reader/reader?bookId=${item.bookId}&chapterId=${chapterId}` });
+}
+
+function toggleManage() {
+  isManaging.value = !isManaging.value;
+  selectedIds.value.clear();
+}
+
+function onLongPress(bookId: number) {
+  if (!isManaging.value) {
+    isManaging.value = true;
+    selectedIds.value = new Set([bookId]);
+  }
+}
+
+function toggleSelect(bookId: number) {
+  const newSet = new Set(selectedIds.value);
+  if (newSet.has(bookId)) {
+    newSet.delete(bookId);
+  } else {
+    newSet.add(bookId);
+  }
+  selectedIds.value = newSet;
+}
+
+function toggleSelectAll() {
+  const ids = filteredRecords.value.map(r => r.bookId);
+  if (isAllSelected.value) {
+    selectedIds.value = new Set();
+  } else {
+    selectedIds.value = new Set(ids);
+  }
+}
+
+async function batchRemove() {
+  if (selectedIds.value.size === 0) return;
+  uni.showModal({
+    title: '确认删除',
+    content: `确定从书架移除 ${selectedIds.value.size} 本书？`,
+    confirmColor: '#A34A2E',
+    success: async (res: any) => {
+      if (res.confirm) {
+        try {
+          const { removeFromShelf } = await import('@/api/book');
+          const promises = Array.from(selectedIds.value).map(id => removeFromShelf(id));
+          await Promise.all(promises);
+          uni.showToast({ title: '移除成功', icon: 'none' });
+          selectedIds.value.clear();
+          isManaging.value = false;
+          loadShelf();
+        } catch (e) {
+          uni.showToast({ title: '移除失败', icon: 'none' });
+        }
+      }
+    }
+  });
 }
 </script>
 
@@ -472,10 +554,15 @@ function goReader(item: ExtendedShelfItem) {
 }
 
 /* Tabs */
+.tabs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
 .tabs {
   display: flex;
   gap: 16rpx;
-  margin-bottom: 24rpx;
 }
 .tab {
   padding: 12rpx 32rpx;
@@ -495,6 +582,12 @@ function goReader(item: ExtendedShelfItem) {
 .tab.active text {
   color: #FFFFFF;
 }
+.manage-btn {
+  font-size: 26rpx;
+  color: #A34A2E;
+  font-family: 'Noto Sans SC', sans-serif;
+  padding: 8rpx 16rpx;
+}
 
 /* Book list */
 .book-list {
@@ -502,6 +595,7 @@ function goReader(item: ExtendedShelfItem) {
 }
 .book-row {
   display: flex;
+  align-items: center;
   gap: 20rpx;
   background: #FFFFFF;
   border-radius: 20rpx;
@@ -509,6 +603,28 @@ function goReader(item: ExtendedShelfItem) {
   margin-bottom: 20rpx;
   box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
   border: 1rpx solid rgba(163, 74, 46, 0.06);
+}
+.book-list.managing .book-row {
+  padding-left: 20rpx;
+}
+.book-select {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 2rpx solid #CCCCCC;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.book-select.selected {
+  background: #A34A2E;
+  border-color: #A34A2E;
+}
+.select-check {
+  font-size: 24rpx;
+  color: #FFFFFF;
+  font-weight: 700;
 }
 .book-cover {
   width: 120rpx;
@@ -608,6 +724,46 @@ function goReader(item: ExtendedShelfItem) {
   color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
   flex-shrink: 0;
+}
+
+/* 批量操作栏 */
+.batch-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background: #FFFFFF;
+  border-top: 1rpx solid #E8E2D8;
+  z-index: 200;
+}
+.batch-select-all {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.batch-select-all text {
+  font-size: 28rpx;
+  color: #2C2C2C;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.batch-delete {
+  padding: 16rpx 48rpx;
+  border-radius: 48rpx;
+  background: #A34A2E;
+}
+.batch-delete.disabled {
+  background: #CCCCCC;
+}
+.batch-delete text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: 600;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 
 /* Empty */

@@ -1839,18 +1839,26 @@ async function buyChapter() {
 }
 .paging-icon {
   font-size: 40rpx;
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .paging-info {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 4rpx;
+  min-width: 0;
 }
 .paging-title {
   font-size: 28rpx;
   font-weight: 600;
   color: #2C2C2C;
   font-family: 'Noto Sans SC', sans-serif;
+  line-height: 1.4;
 }
 .paging-title.dark-text {
   color: #EEEEEE;
@@ -1859,6 +1867,7 @@ async function buyChapter() {
   font-size: 24rpx;
   color: #888888;
   font-family: 'Noto Sans SC', sans-serif;
+  line-height: 1.4;
 }
 .paging-desc.dark-text {
   color: #AAAAAA;
@@ -1868,6 +1877,7 @@ async function buyChapter() {
   height: 24rpx;
   border-radius: 50%;
   background: #A34A2E;
+  flex-shrink: 0;
 }
 
 /* 下拉提示 */
