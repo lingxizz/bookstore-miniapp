@@ -1,258 +1,428 @@
 <template>
-  <view class="page" :style="{ backgroundColor: COLORS.bg }">
-    <view class="header">
-      <text class="header-label">书城</text>
-    </view>
-
-    <!-- 搜索栏 -->
-    <view class="search-bar">
-      <text class="search-icon">⌕</text>
-      <input class="search-input" placeholder="搜索书名、作者" placeholder-class="search-placeholder" v-model="search" />
-    </view>
-
-    <!-- 分类按钮 -->
-    <view class="cat-btns">
-      <view
-        v-for="cat in categories"
-        :key="cat"
-        class="cat-btn"
-        :class="{ active: activeCat === cat }"
-        @click="activeCat = cat"
-      >
-        <text>{{ cat }}</text>
+  <view class="page" :style="{ backgroundColor: '#F8F4F0' }">
+    <!-- Loading skeleton -->
+    <view v-if="isLoading" class="skeleton-page">
+      <view class="sk-header"></view>
+      <view class="sk-search"></view>
+      <view class="sk-filter-row">
+        <view class="sk-filter-tag" v-for="i in 4" :key="i"></view>
       </view>
-    </view>
-
-    <!-- 一级分类tab -->
-    <view class="primary-tabs">
-      <view
-        v-for="tab in primaryTabs"
-        :key="tab"
-        class="tab"
-        :class="{ active: activePrimary === tab }"
-        @click="activePrimary = tab"
-      >
-        <text>{{ tab }}</text>
+      <view class="sk-filter-row">
+        <view class="sk-filter-tag" v-for="i in 3" :key="i"></view>
       </view>
-    </view>
-
-    <!-- 二级榜单tab -->
-    <view class="rank-tabs">
-      <view
-        v-for="tab in rankTabs"
-        :key="tab"
-        class="tab"
-        :class="{ active: activeRank === tab }"
-        @click="activeRank = tab"
-      >
-        <text>{{ tab }}</text>
-      </view>
-    </view>
-
-    <scroll-view scroll-y class="content">
-      <view class="list">
-        <BookRow
-          v-for="(book, idx) in filteredBooks"
-          :key="book.id"
-          v-bind="book"
-        />
-      </view>
-
-      <!-- 底部featured推广 -->
-      <view class="featured">
-        <view class="featured-icon">
-          <text class="featured-icon-text">精选</text>
+      <view class="sk-book-row" v-for="i in 5" :key="i">
+        <view class="sk-cover"></view>
+        <view class="sk-book-info">
+          <view class="sk-line w70"></view>
+          <view class="sk-line w40"></view>
+          <view class="sk-line w60"></view>
         </view>
-        <view class="featured-info">
-          <text class="featured-title">每周精选推荐</text>
-          <text class="featured-desc">编辑团队精心挑选的高分作品</text>
+      </view>
+    </view>
+
+    <view v-else>
+      <!-- 顶部 -->
+      <view class="header">
+        <text class="header-label">书城</text>
+      </view>
+
+      <!-- 搜索栏 -->
+      <view class="search-bar" @click="goSearch">
+        <svg class="search-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#AAAAAA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.3-4.3"/>
+        </svg>
+        <input class="search-input" placeholder="搜索书名、作者" placeholder-class="search-placeholder" v-model="search" />
+      </view>
+
+      <!-- 分类筛选 -->
+      <scroll-view class="filter-scroll" scroll-x show-scrollbar="false">
+        <view class="filter-row">
+          <view class="filter-tag" v-for="cat in categories" :key="cat"
+                :class="{ active: activeCat === cat }" @click="activeCat = cat">
+            <text>{{ cat }}</text>
+          </view>
         </view>
+      </scroll-view>
+
+      <!-- 排序 + 状态 -->
+      <view class="sub-filter">
+        <view class="sort-tabs">
+          <view class="sort-tab" v-for="s in sortOptions" :key="s.value"
+                :class="{ active: sort === s.value }" @click="sort = s.value">
+            <text>{{ s.label }}</text>
+          </view>
+        </view>
+        <view class="status-tabs">
+          <view class="status-tab" v-for="st in statusOptions" :key="st.value"
+                :class="{ active: status === st.value }" @click="status = st.value">
+            <text>{{ st.label }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 书籍列表 -->
+      <view class="book-list">
+        <view class="book-row" v-for="book in filteredBooks" :key="book.id" @click="goDetail(book.id)">
+          <view class="book-cover" :style="{ backgroundColor: book.coverColor || '#A34A2E' }">
+            <image v-if="book.cover" class="book-cover-img" :src="book.cover" mode="aspectFill" />
+            <text v-else class="book-cover-text">{{ book.title.charAt(0) }}</text>
+          </view>
+          <view class="book-info">
+            <text class="book-title">{{ book.title }}</text>
+            <text class="book-author">{{ book.author }}</text>
+            <view class="book-meta">
+              <text class="book-cat">{{ book.category }}</text>
+              <text class="book-status" :class="book.status">{{ book.status === 'completed' ? '完本' : '连载' }}</text>
+            </view>
+            <view class="book-rating" v-if="book.rating">
+              <text class="rating-star">★</text>
+              <text class="rating-num">{{ book.rating }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 结果数 -->
+      <view class="result-count" v-if="filteredBooks.length">
+        <text>共 {{ filteredBooks.length }} 本</text>
       </view>
 
       <Folio :num="2" />
-    </scroll-view>
+    </view>
+    <CustomTabBar />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { COLORS } from '@/utils/constants';
-import { fetchBooks, type Book } from '@/api/book';
-import BookRow from '@/components/BookRow.vue';
+import { fetchBookFilter, type Book } from '@/api/book';
 import Folio from '@/components/Folio.vue';
+import CustomTabBar from '@/components/CustomTabBar.vue';
 
 const search = ref('');
-const categories = ['全部', '历史', '科幻', '文学', '悬疑', '社科'];
-const primaryTabs = ['全部', '热门', '推荐', '新书'];
-const rankTabs = ['推荐榜', '完本榜', '巅峰榜', '新书榜'];
-
+const categories = ref(['全部', '武侠仙侠', '玄幻奇幻', '都市言情', '历史军事', '科幻灵异', '游戏竞技']);
 const activeCat = ref('全部');
-const activePrimary = ref('全部');
-const activeRank = ref('推荐榜');
-const apiBooks = ref<Book[]>([]);
+const sort = ref('hot');
+const sortOptions = [
+  { label: '热度', value: 'hot' },
+  { label: '评分', value: 'rating' },
+  { label: '最新', value: 'new' },
+];
+const status = ref('');
+const statusOptions = [
+  { label: '全部', value: '' },
+  { label: '连载', value: 'ongoing' },
+  { label: '完本', value: 'completed' },
+];
+const books = ref<Book[]>([]);
+const isLoading = ref(true);
+const firstLoad = ref(true);
 
 const filteredBooks = computed(() => {
-  let list = apiBooks.value.map((b, i) => ({
-    ...b,
-    coverIdx: i,
-    score: b.rating,
-    chapterPrice: b.price,
-    chapterCount: b.wordCount,
-  }));
+  let result = books.value;
   if (activeCat.value !== '全部') {
-    list = list.filter(b => b.category === activeCat.value);
+    result = result.filter(b => b.category === activeCat.value);
   }
-  if (search.value.trim()) {
-    const kw = search.value.trim().toLowerCase();
-    list = list.filter(b => b.title.includes(kw) || b.author.includes(kw));
+  if (search.value) {
+    const q = search.value.toLowerCase();
+    result = result.filter(b => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q));
   }
-  if (activeRank.value === '推荐榜') list = [...list].sort((a,b) => b.score - a.score);
-  else if (activeRank.value === '新书榜') list = [...list].reverse();
-  else if (activeRank.value === '巅峰榜') list = [...list].sort((a,b) => b.chapterCount - a.chapterCount);
-  return list;
+  return result;
 });
 
-onMounted(async () => {
+watch([activeCat, sort, status], () => {
+  loadBooks();
+});
+
+onMounted(() => {
+  isLoading.value = firstLoad.value;
+  loadBooks();
+});
+
+async function loadBooks() {
   try {
-    apiBooks.value = await fetchBooks();
+    const params: any = { sort: sort.value, status: status.value };
+    if (activeCat.value !== '全部') params.category = activeCat.value;
+    books.value = await fetchBookFilter(params);
   } catch (e) {
     console.error('fetch books failed', e);
+  } finally {
+    isLoading.value = false;
+    firstLoad.value = false;
   }
-});
+}
+
+function goDetail(id: number) {
+  uni.navigateTo({ url: '/pages/detail/detail?id=' + id });
+}
+function goSearch() {
+  uni.navigateTo({ url: '/pages/search/search' });
+}
 </script>
 
 <style scoped>
 .page {
   min-height: 100vh;
+  padding: 0 32rpx 160rpx;
+  background: #F8F4F0;
+}
+
+/* Skeleton */
+.skeleton-page {
+  padding: 24rpx 0;
+}
+.sk-header {
+  height: 48rpx;
+  width: 120rpx;
+  background: #E8E2D8;
+  border-radius: 8rpx;
+  margin-bottom: 24rpx;
+  animation: shimmer 1.5s infinite;
+}
+.sk-search {
+  height: 80rpx;
+  background: #FFFFFF;
+  border-radius: 48rpx;
+  margin-bottom: 24rpx;
+  animation: shimmer 1.5s infinite;
+}
+.sk-filter-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+.sk-filter-tag {
+  width: 140rpx;
+  height: 56rpx;
+  background: #E8E2D8;
+  border-radius: 48rpx;
+  animation: shimmer 1.5s infinite;
+}
+.sk-book-row {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #F5F0EA;
+}
+.sk-cover {
+  width: 140rpx;
+  aspect-ratio: 2/3;
+  border-radius: 12rpx;
+  background: #E8E2D8;
+  animation: shimmer 1.5s infinite;
+}
+.sk-book-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  padding-bottom: 100rpx;
+  gap: 12rpx;
 }
+.sk-line {
+  height: 24rpx;
+  background: #E8E2D8;
+  border-radius: 8rpx;
+  animation: shimmer 1.5s infinite;
+}
+.sk-line.w70 { width: 70%; }
+.sk-line.w40 { width: 40%; }
+.sk-line.w60 { width: 60%; }
+@keyframes shimmer {
+  0% { background: #E8E2D8; }
+  50% { background: #F0EBE3; }
+  100% { background: #E8E2D8; }
+}
+
+/* Header */
 .header {
-  padding: 48rpx 32rpx 0;
+  padding: 48rpx 0 24rpx;
 }
 .header-label {
   font-size: 40rpx;
   font-weight: 700;
-  color: #2C2C2C;
-  letter-spacing: 4rpx;
+  color: #1C1C19;
+  font-family: 'Noto Serif SC', serif;
 }
+
+/* Search */
 .search-bar {
   display: flex;
   align-items: center;
-  margin: 24rpx 32rpx;
-  padding: 16rpx 24rpx;
+  gap: 16rpx;
   background: #FFFFFF;
-  border-radius: 40rpx;
-  border: 1rpx solid #E8E2D8;
+  border-radius: 48rpx;
+  padding: 20rpx 32rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid rgba(163, 74, 46, 0.08);
 }
-.search-icon {
-  font-size: 28rpx;
-  color: #AAA;
-  margin-right: 12rpx;
+.search-icon-svg {
+  width: 32rpx;
+  height: 32rpx;
+  flex-shrink: 0;
 }
 .search-input {
   flex: 1;
-  font-size: 26rpx;
-  color: #2C2C2C;
+  font-size: 28rpx;
+  color: #1C1C19;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 .search-placeholder {
-  color: #AAA;
+  color: #AAAAAA;
 }
-.cat-btns {
+
+/* Filter */
+.filter-scroll {
+  margin-bottom: 16rpx;
+}
+.filter-row {
   display: flex;
   gap: 16rpx;
-  padding: 0 32rpx 16rpx;
-  overflow-x: auto;
-}
-.cat-btn {
-  padding: 10rpx 28rpx;
-  border-radius: 32rpx;
-  background: #FFFFFF;
-  border: 1rpx solid #E8E2D8;
-  font-size: 24rpx;
-  color: #888;
+  flex-wrap: nowrap;
   white-space: nowrap;
+}
+.filter-tag {
+  padding: 12rpx 28rpx;
+  border-radius: 48rpx;
+  background: #FFFFFF;
+  border: 1rpx solid rgba(163, 74, 46, 0.1);
   flex-shrink: 0;
+  white-space: nowrap;
 }
-.cat-btn.active {
-  background: #E8A23E;
-  border-color: #E8A23E;
-  color: #fff;
+.filter-tag.active {
+  background: #A34A2E;
+  border-color: #A34A2E;
 }
-.primary-tabs {
-  display: flex;
-  padding: 16rpx 32rpx;
-  gap: 32rpx;
-  border-bottom: 1rpx solid #E8E2D8;
-}
-.primary-tabs .tab {
-  font-size: 28rpx;
-  color: #AAA;
-  padding-bottom: 8rpx;
-  border-bottom: 2rpx solid transparent;
-}
-.primary-tabs .tab.active {
-  color: #2C2C2C;
-  border-bottom-color: #E8A23E;
-}
-.rank-tabs {
-  display: flex;
-  padding: 16rpx 32rpx;
-  gap: 24rpx;
-}
-.rank-tabs .tab {
+.filter-tag text {
   font-size: 26rpx;
-  color: #AAA;
+  color: #1C1C19;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.rank-tabs .tab.active {
-  color: #E8A23E;
+.filter-tag.active text {
+  color: #FFFFFF;
+}
+
+/* Sub filter */
+.sub-filter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+.sort-tabs, .status-tabs {
+  display: flex;
+  gap: 8rpx;
+}
+.sort-tab, .status-tab {
+  padding: 8rpx 20rpx;
+  border-radius: 24rpx;
+}
+.sort-tab.active, .status-tab.active {
+  background: rgba(163, 74, 46, 0.08);
+}
+.sort-tab text, .status-tab text {
+  font-size: 24rpx;
+  color: #645D55;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.sort-tab.active text, .status-tab.active text {
+  color: #A34A2E;
   font-weight: 600;
 }
-.content {
-  flex: 1;
-  overflow: hidden;
-  padding: 0 32rpx;
+
+/* Book list */
+.book-list {
+  margin-bottom: 24rpx;
 }
-.list {
-  padding-bottom: 24rpx;
-}
-.featured {
+.book-row {
   display: flex;
-  align-items: center;
-  padding: 24rpx;
-  background: #FFFFFF;
-  border-radius: 16rpx;
-  border: 1rpx solid #E8E2D8;
-  margin: 24rpx 0;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #F5F0EA;
 }
-.featured-icon {
-  width: 100rpx;
-  height: 100rpx;
+.book-row:last-child {
+  border-bottom: none;
+}
+.book-cover {
+  width: 140rpx;
+  aspect-ratio: 2 / 3;
   border-radius: 12rpx;
-  background: #E8A23E;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 24rpx;
-  flex-shrink: 0;
+  overflow: hidden;
 }
-.featured-icon-text {
+.book-cover-img {
+  width: 100%;
+  height: 100%;
+}
+.book-cover-text {
+  font-size: 40rpx;
   color: #fff;
-  font-size: 28rpx;
   font-weight: 700;
+  font-family: 'Noto Serif SC', serif;
 }
-.featured-info {
+.book-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  overflow: hidden;
 }
-.featured-title {
-  font-size: 28rpx;
+.book-title {
+  font-size: 30rpx;
   font-weight: 600;
-  color: #2C2C2C;
-  margin-bottom: 6rpx;
+  color: #1C1C19;
+  font-family: 'Noto Sans SC', sans-serif;
 }
-.featured-desc {
+.book-author {
   font-size: 24rpx;
-  color: #888;
+  color: #55423D;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.book-meta {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+.book-cat {
+  font-size: 22rpx;
+  color: #645D55;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.book-status {
+  font-size: 20rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  background: #F0EBE3;
+  color: #645D55;
+}
+.book-status.completed {
+  background: rgba(163, 74, 46, 0.08);
+  color: #A34A2E;
+}
+.book-rating {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+.rating-star {
+  font-size: 20rpx;
+  color: #FFD700;
+}
+.rating-num {
+  font-size: 22rpx;
+  color: #A34A2E;
+  font-weight: 600;
+}
+.result-count {
+  text-align: center;
+  padding: 24rpx 0;
+}
+.result-count text {
+  font-size: 24rpx;
+  color: #AAAAAA;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 </style>
