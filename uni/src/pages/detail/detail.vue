@@ -215,10 +215,25 @@ const toggleShelf = async () => {
     if (inShelf.value) {
       await removeFromShelf(book.value.id);
       inShelf.value = false;
+      // 同步移除本地 storage
+      const shelfKey = 'shelf_books';
+      const localShelf = uni.getStorageSync(shelfKey) || [];
+      const idx = localShelf.findIndex((b: any) => b.id === book.value.id);
+      if (idx >= 0) {
+        localShelf.splice(idx, 1);
+        uni.setStorageSync(shelfKey, localShelf);
+      }
       uni.showToast({ title: '已移除书架', icon: 'none' });
     } else {
       await addToShelf(book.value.id);
       inShelf.value = true;
+      // 同步到本地 storage，供阅读器使用
+      const shelfKey = 'shelf_books';
+      const localShelf = uni.getStorageSync(shelfKey) || [];
+      if (!localShelf.some((b: any) => b.id === book.value.id)) {
+        localShelf.unshift({ id: book.value.id, title: book.value.title || '未知书籍', addedAt: Date.now() });
+        uni.setStorageSync(shelfKey, localShelf);
+      }
       uni.showToast({ title: '已加入书架', icon: 'none' });
     }
   } catch (e: any) {
