@@ -61,8 +61,13 @@
         </view>
       </view>
 
+      <!-- 切换 loading -->
+      <view v-show="isSwitching && !isLoading" class="switch-loading">
+        <view class="switch-spinner" />
+      </view>
+
       <!-- 书籍列表 -->
-      <view class="book-list">
+      <view v-show="!isSwitching" class="book-list">
         <view class="book-row" v-for="book in filteredBooks" :key="book.id" @click="goDetail(book.id)">
           <view class="book-cover" :style="{ backgroundColor: book.coverColor || '#A34A2E' }">
             <image v-if="book.cover" class="book-cover-img" :src="book.cover" mode="aspectFill" />
@@ -122,6 +127,7 @@ const statusOptions = [
 ];
 const books = ref<Book[]>([]);
 const isLoading = ref(true);
+const isSwitching = ref(false);
 const firstLoad = ref(true);
 
 const filteredBooks = computed(() => {
@@ -136,8 +142,15 @@ const filteredBooks = computed(() => {
   return result;
 });
 
+let loadTimer: ReturnType<typeof setTimeout> | null = null;
+function debouncedLoadBooks() {
+  if (loadTimer) clearTimeout(loadTimer);
+  loadTimer = setTimeout(() => loadBooks(), 300);
+}
+
 watch([activeCat, sort, status], () => {
-  loadBooks();
+  isSwitching.value = true;
+  debouncedLoadBooks();
 });
 
 onMounted(() => {
@@ -146,6 +159,8 @@ onMounted(() => {
 });
 
 async function loadBooks() {
+  isSwitching.value = true;
+  const startTime = Date.now();
   try {
     const params: any = { sort: sort.value, status: status.value };
     if (activeCat.value !== '全部') params.category = activeCat.value;
@@ -153,8 +168,14 @@ async function loadBooks() {
   } catch (e) {
     console.error('fetch books failed', e);
   } finally {
+    // 保证 loading 至少显示 200ms，避免快速请求闪烁
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 200) {
+      await new Promise(r => setTimeout(r, 200 - elapsed));
+    }
     isLoading.value = false;
     firstLoad.value = false;
+    isSwitching.value = false;
   }
 }
 
@@ -337,6 +358,43 @@ function formatWordCount(n?: number): string {
 .sort-tab.active text, .status-tab.active text {
   color: #A34A2E;
   font-weight: 600;
+}
+
+/* Switch loading */
+.switch-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24rpx 0;
+}
+.switch-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 4rpx solid #E8E2D8;
+  border-top-color: #A34A2E;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Switch loading */
+.switch-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400rpx;
+}
+.switch-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 4rpx solid #E8E2D8;
+  border-top-color: #A34A2E;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Book list */

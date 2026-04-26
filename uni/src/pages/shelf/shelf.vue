@@ -57,7 +57,7 @@
             </view>
             <text class="progress-text">已读 {{ recentBook.progress }}%</text>
           </view>
-          <text class="recent-continue">继续阅读 →</text>
+          <text class="recent-continue" @click.stop="goReader(recentBook)">继续阅读 →</text>
         </view>
       </view>
 
@@ -156,8 +156,13 @@ const readingCount = computed(() => records.value.filter(r => r.readStatus === '
 const finishedCount = computed(() => records.value.filter(r => r.readStatus === 'finished').length);
 
 const recentBook = computed(() => {
-  const reading = records.value.filter(r => r.readStatus === 'reading');
-  return reading.length > 0 ? reading[0] : records.value[0];
+  if (records.value.length === 0) return undefined;
+  const sorted = [...records.value].sort((a, b) => {
+    const aTime = a.lastReadAt ? new Date(a.lastReadAt).getTime() : 0;
+    const bTime = b.lastReadAt ? new Date(b.lastReadAt).getTime() : 0;
+    return bTime - aTime;
+  });
+  return sorted[0];
 });
 
 const filteredRecords = computed(() => {
@@ -177,10 +182,7 @@ onMounted(() => {
 });
 
 onShow(() => {
-  if (firstLoad.value) {
-    isLoading.value = true;
-    loadShelf();
-  }
+  loadShelf();
 });
 
 async function loadShelf() {
@@ -201,6 +203,11 @@ async function loadShelf() {
 function goDetail(id: number) {
   if (!id) return;
   uni.navigateTo({ url: '/pages/detail/detail?id=' + id });
+}
+
+function goReader(item: ExtendedShelfItem) {
+  const chapterId = item.lastChapterId || 1;
+  uni.navigateTo({ url: `/pages/reader/reader?bookId=${item.bookId}&chapterId=${chapterId}` });
 }
 </script>
 

@@ -187,8 +187,8 @@ export function saveProgress(bookId: number, chapterId: number, progress: number
 }
 
 // 广告解锁
-export function unlockByAd(bookId: number, chapterId: number, adToken: string) {
-  return request('/api/unlock/ad', 'POST', { bookId, chapterId, adToken });
+export function unlockByAd(chapterId: number, adToken: string) {
+  return request('/api/ad/unlock', 'POST', { chapterId, adToken });
 }
 
 // H5 登录

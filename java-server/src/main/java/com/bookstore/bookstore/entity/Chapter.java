@@ -30,6 +30,9 @@ public class Chapter {
     @Column(nullable = false)
     private Boolean isFree = false;
 
+    @Column(nullable = false, name = "word_count")
+    private Integer wordCount = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -79,6 +82,9 @@ public class Chapter {
 
     public Boolean getIsFree() { return isFree; }
     public void setIsFree(Boolean isFree) { this.isFree = isFree; }
+
+    public Integer getWordCount() { return wordCount; }
+    public void setWordCount(Integer wordCount) { this.wordCount = wordCount; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

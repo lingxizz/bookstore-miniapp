@@ -122,8 +122,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { onLoad } from '@dcloudio/uni-app';
+import { ref, computed, onActivated } from 'vue';
+import { onLoad, onShow } from '@dcloudio/uni-app';
 import { COVERS } from '@/utils/constants';
 import { fetchBook, fetchChapters, checkShelf, fetchProgress, addToShelf, removeFromShelf, type Book, type Chapter } from '@/api/book';
 import ChapterItem from '@/components/ChapterItem.vue';
@@ -135,11 +135,16 @@ const isLoading = ref(true);
 const firstLoad = ref(true);
 const inShelf = ref(false);
 const lastChapterId = ref<number | null>(null);
+const unlockedChapters = ref<number[]>([]);
 
 const coverColor = computed(() => COVERS[(book.value.id || 0) % COVERS.length]);
 
-onLoad(async (opts: any) => {
-  const id = parseInt(opts?.id || '1');
+async function loadDetailData(id: number) {
+  // 加载本地已解锁章节
+  const cached = uni.getStorageSync(`unlocked_${id}`);
+  if (cached) {
+    try { unlockedChapters.value = JSON.parse(cached); } catch {}
+  }
   try {
     const [b, chs, shelfRes, progress] = await Promise.all([
       fetchBook(id),
@@ -156,6 +161,23 @@ onLoad(async (opts: any) => {
   } finally {
     isLoading.value = false;
     firstLoad.value = false;
+  }
+}
+
+onLoad(async (opts: any) => {
+  const id = parseInt(opts?.id || '1');
+  await loadDetailData(id);
+});
+
+onShow(() => {
+  if (book.value.id) {
+    loadDetailData(book.value.id);
+  }
+});
+
+onActivated(() => {
+  if (book.value.id) {
+    loadDetailData(book.value.id);
   }
 });
 
@@ -240,7 +262,7 @@ function getChapterStatus(ch: Chapter): 'read' | 'reading' | 'locked' | 'default
     if (ch.id === lastChapterId.value) return 'reading';
     if (ch.id < lastChapterId.value) return 'read';
   }
-  if (!ch.isFree) return 'locked';
+  if (!ch.isFree && !unlockedChapters.value.includes(ch.id)) return 'locked';
   return 'default';
 }
 </script>

@@ -12,11 +12,14 @@
       id="reader-content"
       class="content-scroll"
       @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
       @touchend="onTouchEnd"
       :style="scrollStyle"
     >
-      <!-- 顶部哨兵：用于检测滚动到顶部时加载上一章 -->
-      <view id="top-sentinel" style="height: 1px;" />
+      <!-- 下拉提示 -->
+      <view v-if="pullState !== 'idle'" class="pull-hint" :style="{ height: pullOffset + 'px' }">
+        <text class="pull-hint-text">{{ pullState === 'will-load' ? '松开加载上一章' : '下拉加载上一章' }}</text>
+      </view>
 
       <!-- 上一章加载中 -->
       <view v-if="loadingPrev" class="loading-spinner">
@@ -30,17 +33,26 @@
         v-for="section in sections"
         :key="section.chapterId"
         class="section-block"
+        :class="{ locked: section.locked }"
         :id="'ch-' + section.chapterId"
+        @click="section.locked ? openUnlock(section.chapterId) : null"
       >
         <text class="chapter-heading" :style="headingStyle">{{ section.title }}</text>
-        <view
-          class="paragraph"
-          v-for="(p, i) in section.paragraphs"
-          :key="i"
-          :style="paragraphWrapStyle"
-        >
-          <text :style="textStyle">{{ p }}</text>
+        <view v-if="section.locked" class="locked-block">
+          <text class="locked-icon">🔒</text>
+          <text class="locked-title">本章为付费章节</text>
+          <text class="locked-sub">点击解锁后继续阅读</text>
         </view>
+        <template v-else>
+          <view
+            class="paragraph"
+            v-for="(p, i) in section.paragraphs"
+            :key="i"
+            :style="paragraphWrapStyle"
+          >
+            <text :style="textStyle">{{ p }}</text>
+          </view>
+        </template>
       </view>
 
       <!-- 下一章加载中 -->
@@ -270,13 +282,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
-import { fetchChapters, fetchChapterContent, saveProgress, checkUnlock, unlockByAd, buyChapter as apiBuyChapter, type Chapter } from '@/api/book';
+import { fetchBook, fetchChapters, fetchChapterContent, saveProgress, checkUnlock, unlockByAd, buyChapter as apiBuyChapter, type Chapter } from '@/api/book';
 import { fetchReaderConfig, saveReaderConfig } from '@/api/user';
+import { adComplete } from '@/api/ad';
 
 const bookId = ref(0);
 const chapterId = ref(0);
+const bookWordCount = ref(0);
 const chapters = ref<Chapter[]>([]);
-const sections = ref<Array<{ chapterId: number; title: string; paragraphs: string[] }>>([]);
+const sections = ref<Array<{ chapterId: number; title: string; paragraphs: string[]; locked?: boolean }>>([]);
 const isLoading = ref(false);
 const loadingNext = ref(false);
 const loadingPrev = ref(false);
@@ -287,6 +301,8 @@ const showAdUnlock = ref(false);
 const currentScrollTop = ref(0);
 const activeSettingsTab = ref('display');
 const unlockedChapters = ref<number[]>([]);
+const pullOffset = ref(0);
+const pullState = ref<'idle' | 'pulling' | 'will-load'>('idle');
 
 // IntersectionObserver
 let bottomObserver: IntersectionObserver | null = null;
@@ -384,10 +400,30 @@ const themeOptions = [
 onLoad(async (opts: any) => {
   bookId.value = parseInt(opts?.bookId || '1');
   chapterId.value = parseInt(opts?.chapterId || '1');
+  loadUnlockedFromStorage();
   await loadConfig();
+  try {
+    const book = await fetchBook(bookId.value);
+    bookWordCount.value = book?.wordCount || 0;
+  } catch {}
   await loadChapters();
   await loadCurrentChapter();
 });
+
+function loadUnlockedFromStorage() {
+  const key = `unlocked_${bookId.value}`;
+  const cached = uni.getStorageSync(key);
+  if (cached) {
+    try {
+      unlockedChapters.value = JSON.parse(cached);
+    } catch {}
+  }
+}
+
+function saveUnlockedToStorage() {
+  const key = `unlocked_${bookId.value}`;
+  uni.setStorageSync(key, JSON.stringify(unlockedChapters.value));
+}
 
 // 加载配置
 async function loadConfig() {
@@ -444,6 +480,12 @@ async function loadCurrentChapter() {
     if (!ch) return;
 
     if (!ch.isFree && !isUnlocked(ch.id)) {
+      sections.value = [{
+        chapterId: ch.id,
+        title: ch.title,
+        paragraphs: [],
+        locked: true,
+      }];
       showAdUnlock.value = true;
       isLoading.value = false;
       return;
@@ -457,7 +499,7 @@ async function loadCurrentChapter() {
     }];
     const el = getScrollEl();
     if (el) el.scrollTop = 0;
-    saveProgress(bookId.value, chapterId.value, 0).catch(() => {});
+    saveProgress(bookId.value, chapterId.value, calculateBookProgress(chapterId.value, 0)).catch(() => {});
     await nextTick();
     setupObservers();
     await checkAndLoadMore();
@@ -470,6 +512,29 @@ async function loadCurrentChapter() {
 
 function isUnlocked(cid: number) {
   return unlockedChapters.value.includes(cid);
+}
+
+function calculateBookProgress(currentChapterId: number, chapterProgress: number): number {
+  let totalWords = bookWordCount.value;
+  if (totalWords === 0) {
+    totalWords = chapters.value.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+  }
+  if (totalWords === 0) return 0;
+
+  const sorted = [...chapters.value].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const idx = sorted.findIndex(c => c.id === currentChapterId);
+  if (idx < 0) return 0;
+
+  let readWords = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    if (i < idx) {
+      readWords += sorted[i].wordCount || 0;
+    } else if (i === idx) {
+      readWords += (sorted[i].wordCount || 0) * (chapterProgress / 100);
+      break;
+    }
+  }
+  return Math.min(100, Math.round((readWords / totalWords) * 100));
 }
 
 function getNextChapter() {
@@ -487,11 +552,40 @@ function getScrollEl() {
   return scrollEl;
 }
 
-// 滚动监听
+// 滚动监听 + 进度保存（防抖）
+let saveProgressTimer: ReturnType<typeof setTimeout> | null = null;
+let currentReadingChapterId = 0;
+let currentReadingProgress = 0;
+
 function onScrollHandler() {
   const el = getScrollEl();
   if (!el) return;
   currentScrollTop.value = el.scrollTop;
+
+  // 找到当前视口中间位置对应的 section
+  const sectionEls = el.querySelectorAll('.section-block');
+  const containerRect = el.getBoundingClientRect();
+  const midPoint = containerRect.top + containerRect.height / 2;
+
+  for (const sectionEl of sectionEls) {
+    const rect = (sectionEl as HTMLElement).getBoundingClientRect();
+    if (rect.top <= midPoint && rect.bottom >= midPoint) {
+      const cid = parseInt((sectionEl as HTMLElement).id.replace('ch-', ''));
+      const sectionHeight = (sectionEl as HTMLElement).offsetHeight;
+      const progress = sectionHeight > 0
+        ? Math.min(100, Math.max(0, Math.round(((midPoint - rect.top) / sectionHeight) * 100)))
+        : 0;
+
+      currentReadingChapterId = cid;
+      currentReadingProgress = progress;
+
+      if (saveProgressTimer) clearTimeout(saveProgressTimer);
+      saveProgressTimer = setTimeout(() => {
+        saveProgress(bookId.value, cid, calculateBookProgress(cid, progress)).catch(() => {});
+      }, 1000);
+      break;
+    }
+  }
 }
 
 // IntersectionObserver 设置
@@ -513,19 +607,6 @@ function setupObservers() {
     bottomObserver.observe(bottomSentinel);
   }
 
-  // 监听顶部哨兵，提前 200px 触发
-  const topSentinel = document.getElementById('top-sentinel');
-  if (topSentinel) {
-    if (topObserver) topObserver.disconnect();
-    topObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !loadingPrev.value) {
-          autoLoadPrev();
-        }
-      });
-    }, { root, rootMargin: '200px 0px 0px 0px', threshold: 0 });
-    topObserver.observe(topSentinel);
-  }
 }
 
 function teardownObservers() {
@@ -543,6 +624,10 @@ onUnmounted(() => {
   const el = getScrollEl();
   if (el) el.removeEventListener('scroll', onScrollHandler);
   teardownObservers();
+  if (saveProgressTimer) clearTimeout(saveProgressTimer);
+  if (currentReadingChapterId > 0) {
+    saveProgress(bookId.value, currentReadingChapterId, calculateBookProgress(currentReadingChapterId, currentReadingProgress)).catch(() => {});
+  }
 });
 
 // 触摸点击区域识别
@@ -554,6 +639,25 @@ function onTouchStart(e: any) {
   touchStartX = e.touches[0].clientX;
   touchStartY = e.touches[0].clientY;
   touchStartTime = Date.now();
+  pullState.value = 'idle';
+  pullOffset.value = 0;
+}
+
+function onTouchMove(e: any) {
+  const el = getScrollEl();
+  if (!el || el.scrollTop > 0) {
+    pullState.value = 'idle';
+    pullOffset.value = 0;
+    return;
+  }
+  const dy = e.touches[0].clientY - touchStartY;
+  if (dy > 0) {
+    pullOffset.value = Math.min(dy * 0.4, 150);
+    pullState.value = pullOffset.value > 80 ? 'will-load' : 'pulling';
+  } else {
+    pullOffset.value = 0;
+    pullState.value = 'idle';
+  }
 }
 
 function onTouchEnd(e: any) {
@@ -561,14 +665,18 @@ function onTouchEnd(e: any) {
   const dy = e.changedTouches[0].clientY - touchStartY;
   const dt = Date.now() - touchStartTime;
 
-  // 下拉加载上一章：在顶部向下拉（dy > 60）
-  if (dy > 60 && Math.abs(dx) < 40 && dt < 600) {
+  // 下拉加载上一章：必须在顶部且下拉超过阈值
+  if (pullState.value === 'will-load' && Math.abs(dx) < 40 && dt < 1000) {
     const el = getScrollEl();
-    if (el && el.scrollTop <= 2) {
+    if (el && el.scrollTop <= 0) {
+      pullState.value = 'idle';
+      pullOffset.value = 0;
       autoLoadPrev();
       return;
     }
   }
+  pullState.value = 'idle';
+  pullOffset.value = 0;
 
   // 移动距离大或时间长 = 滑动，不是点击
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15 || dt > 350) return;
@@ -601,7 +709,17 @@ async function autoLoadNext() {
   const nextCh = getNextChapter();
   if (!nextCh) return;
   if (sections.value.some(s => s.chapterId === nextCh.id)) return;
-  if (!nextCh.isFree && !isUnlocked(nextCh.id)) return;
+
+  // 付费未解锁：添加锁定占位
+  if (!nextCh.isFree && !isUnlocked(nextCh.id)) {
+    sections.value.push({
+      chapterId: nextCh.id,
+      title: nextCh.title,
+      paragraphs: [],
+      locked: true,
+    });
+    return;
+  }
 
   loadingNext.value = true;
   try {
@@ -612,7 +730,7 @@ async function autoLoadNext() {
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     });
     chapterId.value = nextCh.id;
-    saveProgress(bookId.value, nextCh.id, 0).catch(() => {});
+    saveProgress(bookId.value, nextCh.id, calculateBookProgress(nextCh.id, 0)).catch(() => {});
     await nextTick();
     setupObservers();
     await checkAndLoadMore();
@@ -638,17 +756,17 @@ async function autoLoadPrev() {
       paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
     };
 
-    const el = getScrollEl();
-    const oldScrollTop = el?.scrollTop || 0;
     sections.value.unshift(newSection);
 
     await nextTick();
-    // 估算新内容高度
-    const lineH = config.value.fontSize * 2 * (config.value.lineHeight / 100);
-    const estimatedHeight = newSection.paragraphs.length * lineH + 120;
-    if (el) el.scrollTop = oldScrollTop + estimatedHeight;
+    // prepend 后，原来的第一个 section 变成了第二个，滚动到它的新 offsetTop 即可保持文字位置不变
+    const el = getScrollEl();
+    const sectionEls = el?.querySelectorAll('.section-block');
+    if (el && sectionEls && sectionEls.length > 1) {
+      el.scrollTop = (sectionEls[1] as HTMLElement).offsetTop;
+    }
 
-    chapterId.value = prevCh.id;
+    // 加载上一章时不修改 chapterId，用户当前仍在阅读原来的章节
   } catch (e) {
     console.error('auto load prev failed', e);
   } finally {
@@ -680,6 +798,31 @@ function toggleMenu() {
 function openSettings() {
   showMenu.value = false;
   showSettingsPanel.value = true;
+}
+
+function openUnlock(cid: number) {
+  chapterId.value = cid;
+  showAdUnlock.value = true;
+}
+
+async function loadLockedChapter(cid: number) {
+  try {
+    const data = await fetchChapterContent(bookId.value, cid);
+    const idx = sections.value.findIndex(s => s.chapterId === cid);
+    if (idx >= 0) {
+      sections.value.splice(idx, 1, {
+        chapterId: cid,
+        title: data?.title || sections.value[idx].title,
+        paragraphs: (data?.content || '').split('\n').filter((p: string) => p.trim()),
+      });
+    }
+    saveProgress(bookId.value, cid, calculateBookProgress(cid, 0)).catch(() => {});
+    await nextTick();
+    setupObservers();
+    await checkAndLoadMore();
+  } catch (e) {
+    console.error('load locked chapter failed', e);
+  }
 }
 
 function pageUp() {
@@ -760,12 +903,22 @@ async function watchAd() {
   setTimeout(async () => {
     uni.hideLoading();
     try {
-      const adToken = 'mock_ad_token_' + Date.now();
-      await unlockByAd(bookId.value, chapterId.value, adToken);
+      const tokenRes = await adComplete();
+      const adToken = tokenRes?.token;
+      if (!adToken) {
+        uni.showToast({ title: '今日广告次数已用完', icon: 'none' });
+        return;
+      }
+      const unlockRes = await unlockByAd(chapterId.value, adToken);
+      if (unlockRes?.error) {
+        uni.showToast({ title: '解锁失败', icon: 'none' });
+        return;
+      }
       unlockedChapters.value.push(chapterId.value);
+      saveUnlockedToStorage();
       showAdUnlock.value = false;
       uni.showToast({ title: '解锁成功', icon: 'none' });
-      await loadCurrentChapter();
+      await loadLockedChapter(chapterId.value);
     } catch (e) {
       uni.showToast({ title: '解锁失败', icon: 'none' });
     }
@@ -776,9 +929,10 @@ async function buyChapter() {
   try {
     await apiBuyChapter(bookId.value, chapterId.value);
     unlockedChapters.value.push(chapterId.value);
+    saveUnlockedToStorage();
     showAdUnlock.value = false;
     uni.showToast({ title: '购买成功', icon: 'none' });
-    await loadCurrentChapter();
+    await loadLockedChapter(chapterId.value);
   } catch (e: any) {
     const msg = String(e?.message || e || '');
     if (msg.includes('余额') || msg.includes('insufficient')) {
@@ -1318,6 +1472,60 @@ async function buyChapter() {
   height: 24rpx;
   border-radius: 50%;
   background: #A34A2E;
+}
+
+/* 下拉提示 */
+.pull-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 0.1s ease;
+}
+.pull-hint-text {
+  font-size: 24rpx;
+  color: #A34A2E;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* 锁定章节占位 */
+.section-block.locked {
+  padding: 48rpx 0;
+  text-align: center;
+}
+.locked-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  padding: 48rpx 32rpx;
+  border-radius: 20rpx;
+  background: rgba(163, 74, 46, 0.06);
+  border: 2rpx dashed #D4C4B8;
+}
+.dark-mode .locked-block {
+  background: rgba(255,255,255,0.06);
+  border-color: #444;
+}
+.locked-icon {
+  font-size: 48rpx;
+}
+.locked-title {
+  font-size: 28rpx;
+  color: #2C2C2C;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-weight: 600;
+}
+.dark-mode .locked-title {
+  color: #CCCCCC;
+}
+.locked-sub {
+  font-size: 24rpx;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .locked-sub {
+  color: #AAAAAA;
 }
 
 /* 广告解锁弹窗 */
