@@ -83,7 +83,7 @@
       <view class="tabs-row">
         <view class="tabs">
           <view class="tab" v-for="t in tabList" :key="t.value"
-                :class="{ active: activeTab === t.value, 'tab-shake': isManaging }" @click="activeTab = t.value">
+                :class="{ active: activeTab === t.value }" @click="activeTab = t.value">
             <text>{{ t.label }}</text>
           </view>
         </view>
@@ -93,7 +93,7 @@
       <!-- Book list -->
       <view class="book-list" :class="{ 'managing': isManaging }">
         <view class="book-row" v-for="rec in filteredRecords" :key="rec.id"
-              :class="{ 'row-shake': isManaging && shakingBookId === rec.bookId }"
+              :class="{ 'row-shake': isManaging && shakingBookId === rec.bookId, 'managing-row': isManaging }"
               @click="isManaging ? null : goDetail(rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
           <!-- 管理模式下右侧删除遮罩 -->
@@ -583,25 +583,32 @@ async function removeSingle(bookId: number) {
 /* 抖动动画 */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  10% { transform: translateX(-4rpx) rotate(-1deg); }
-  20% { transform: translateX(4rpx) rotate(1deg); }
-  30% { transform: translateX(-4rpx) rotate(-1deg); }
-  40% { transform: translateX(4rpx) rotate(1deg); }
-  50% { transform: translateX(-3rpx) rotate(-0.5deg); }
-  60% { transform: translateX(3rpx) rotate(0.5deg); }
-  70% { transform: translateX(-2rpx) rotate(-0.5deg); }
-  80% { transform: translateX(2rpx) rotate(0.5deg); }
+  10% { transform: translateX(-6rpx) rotate(-1.5deg); }
+  20% { transform: translateX(6rpx) rotate(1.5deg); }
+  30% { transform: translateX(-6rpx) rotate(-1.5deg); }
+  40% { transform: translateX(6rpx) rotate(1.5deg); }
+  50% { transform: translateX(-4rpx) rotate(-1deg); }
+  60% { transform: translateX(4rpx) rotate(1deg); }
+  70% { transform: translateX(-3rpx) rotate(-0.5deg); }
+  80% { transform: translateX(3rpx) rotate(0.5deg); }
   90% { transform: translateX(-1rpx) rotate(0deg); }
 }
 
-/* Tab 抖动 */
-.tab-shake {
+/* 管理模式所有书籍框抖动 */
+.book-list.managing .book-row {
   animation: shake 0.5s ease-in-out;
 }
 
-/* 长按后单个 book-row 抖动 */
+/* 长按后单个 book-row 额外抖动强调 */
 .row-shake {
-  animation: shake 0.5s ease-in-out;
+  animation: shake 0.6s ease-in-out 2;
+}
+
+/* 管理模式：内容左移，给删除遮罩腾出空间 */
+.managing-row .book-cover,
+.managing-row .book-body {
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transform: translateX(-80rpx);
 }
 
 /* 删除遮罩 */
@@ -619,7 +626,21 @@ async function removeSingle(bookId: number) {
   gap: 8rpx;
   z-index: 10;
   border-radius: 0 20rpx 20rpx 0;
+  animation: slideInRight 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
+
+/* 从右到左滑入 */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 .delete-icon {
   width: 40rpx;
   height: 40rpx;
