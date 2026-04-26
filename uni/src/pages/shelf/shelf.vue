@@ -83,7 +83,7 @@
       <view class="tabs-row">
         <view class="tabs">
           <view class="tab" v-for="t in tabList" :key="t.value"
-                :class="{ active: activeTab === t.value }" @click="activeTab = t.value">
+                :class="{ active: activeTab === t.value, 'tab-shake': isManaging }" @click="activeTab = t.value">
             <text>{{ t.label }}</text>
           </view>
         </view>
@@ -93,10 +93,18 @@
       <!-- Book list -->
       <view class="book-list" :class="{ 'managing': isManaging }">
         <view class="book-row" v-for="rec in filteredRecords" :key="rec.id"
-              @click="isManaging ? toggleSelect(rec.bookId) : goDetail(rec.bookId)"
+              :class="{ 'row-shake': isManaging && shakingBookId === rec.bookId }"
+              @click="isManaging ? null : goDetail(rec.bookId)"
               @longpress="onLongPress(rec.bookId)">
-          <view v-if="isManaging" class="book-select" :class="{ 'selected': selectedIds.has(rec.bookId) }">
-            <view v-if="selectedIds.has(rec.bookId)" class="select-check">✓</view>
+          <!-- 管理模式下右侧删除遮罩 -->
+          <view v-if="isManaging" class="delete-mask" @click="removeSingle(rec.bookId)">
+            <svg class="delete-icon" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            <text class="delete-text">移除</text>
           </view>
           <view class="book-cover" :style="{ backgroundColor: rec.coverColor || '#A34A2E' }">
             <image v-if="rec.cover" class="book-cover-img" :src="rec.cover" mode="aspectFill" />
@@ -119,19 +127,6 @@
               <text class="progress-text-sm">{{ rec.progress }}%</text>
             </view>
           </view>
-        </view>
-      </view>
-
-      <!-- 批量删除底部栏 -->
-      <view v-if="isManaging" class="batch-bar">
-        <view class="batch-select-all" @click="toggleSelectAll">
-          <view class="book-select" :class="{ 'selected': isAllSelected }">
-            <view v-if="isAllSelected" class="select-check">✓</view>
-          </view>
-          <text>全选 ({{ selectedIds.size }})</text>
-        </view>
-        <view class="batch-delete" :class="{ 'disabled': selectedIds.size === 0 }" @click="batchRemove">
-          <text>删除</text>
         </view>
       </view>
 
@@ -168,7 +163,7 @@ const isLoading = ref(true);
 const firstLoad = ref(true);
 const activeTab = ref('all');
 const isManaging = ref(false);
-const selectedIds = ref<Set<number>>(new Set());
+const shakingBookId = ref<number | null>(null);
 const tabList = [
   { label: '全部', value: 'all' },
   { label: '在读', value: 'reading' },
@@ -177,10 +172,6 @@ const tabList = [
 
 const readingCount = computed(() => records.value.filter(r => r.readStatus === 'reading').length);
 const finishedCount = computed(() => records.value.filter(r => r.readStatus === 'finished').length);
-const isAllSelected = computed(() => {
-  const ids = filteredRecords.value.map(r => r.bookId);
-  return ids.length > 0 && ids.every(id => selectedIds.value.has(id));
-});
 
 const recentBook = computed(() => {
   if (records.value.length === 0) return undefined;
@@ -239,50 +230,32 @@ function goReader(item: ExtendedShelfItem) {
 
 function toggleManage() {
   isManaging.value = !isManaging.value;
-  selectedIds.value.clear();
+  shakingBookId.value = null;
 }
 
 function onLongPress(bookId: number) {
   if (!isManaging.value) {
     isManaging.value = true;
-    selectedIds.value = new Set([bookId]);
+    shakingBookId.value = bookId;
   }
 }
 
-function toggleSelect(bookId: number) {
-  const newSet = new Set(selectedIds.value);
-  if (newSet.has(bookId)) {
-    newSet.delete(bookId);
-  } else {
-    newSet.add(bookId);
-  }
-  selectedIds.value = newSet;
-}
-
-function toggleSelectAll() {
-  const ids = filteredRecords.value.map(r => r.bookId);
-  if (isAllSelected.value) {
-    selectedIds.value = new Set();
-  } else {
-    selectedIds.value = new Set(ids);
-  }
-}
-
-async function batchRemove() {
-  if (selectedIds.value.size === 0) return;
+async function removeSingle(bookId: number) {
   uni.showModal({
-    title: '确认删除',
-    content: `确定从书架移除 ${selectedIds.value.size} 本书？`,
+    title: '确认移除',
+    content: '确定从书架移除这本书？',
     confirmColor: '#A34A2E',
     success: async (res: any) => {
       if (res.confirm) {
         try {
           const { removeFromShelf } = await import('@/api/book');
-          const promises = Array.from(selectedIds.value).map(id => removeFromShelf(id));
-          await Promise.all(promises);
+          await removeFromShelf(bookId);
           uni.showToast({ title: '移除成功', icon: 'none' });
-          selectedIds.value.clear();
-          isManaging.value = false;
+          // 如果书架空了，退出管理模式
+          if (records.value.length <= 1) {
+            isManaging.value = false;
+            shakingBookId.value = null;
+          }
           loadShelf();
         } catch (e) {
           uni.showToast({ title: '移除失败', icon: 'none' });
@@ -603,28 +576,58 @@ async function batchRemove() {
   margin-bottom: 20rpx;
   box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
   border: 1rpx solid rgba(163, 74, 46, 0.06);
+  position: relative;
+  overflow: hidden;
 }
-.book-list.managing .book-row {
-  padding-left: 20rpx;
+
+/* 抖动动画 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-4rpx) rotate(-1deg); }
+  20% { transform: translateX(4rpx) rotate(1deg); }
+  30% { transform: translateX(-4rpx) rotate(-1deg); }
+  40% { transform: translateX(4rpx) rotate(1deg); }
+  50% { transform: translateX(-3rpx) rotate(-0.5deg); }
+  60% { transform: translateX(3rpx) rotate(0.5deg); }
+  70% { transform: translateX(-2rpx) rotate(-0.5deg); }
+  80% { transform: translateX(2rpx) rotate(0.5deg); }
+  90% { transform: translateX(-1rpx) rotate(0deg); }
 }
-.book-select {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  border: 2rpx solid #CCCCCC;
+
+/* Tab 抖动 */
+.tab-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* 长按后单个 book-row 抖动 */
+.row-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* 删除遮罩 */
+.delete-mask {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 160rpx;
+  background: rgba(163, 74, 46, 0.9);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  gap: 8rpx;
+  z-index: 10;
+  border-radius: 0 20rpx 20rpx 0;
 }
-.book-select.selected {
-  background: #A34A2E;
-  border-color: #A34A2E;
+.delete-icon {
+  width: 40rpx;
+  height: 40rpx;
 }
-.select-check {
-  font-size: 24rpx;
+.delete-text {
+  font-size: 22rpx;
   color: #FFFFFF;
-  font-weight: 700;
+  font-family: 'Noto Sans SC', sans-serif;
 }
 .book-cover {
   width: 120rpx;
@@ -724,46 +727,6 @@ async function batchRemove() {
   color: #645D55;
   font-family: 'Noto Sans SC', sans-serif;
   flex-shrink: 0;
-}
-
-/* 批量操作栏 */
-.batch-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  background: #FFFFFF;
-  border-top: 1rpx solid #E8E2D8;
-  z-index: 200;
-}
-.batch-select-all {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-.batch-select-all text {
-  font-size: 28rpx;
-  color: #2C2C2C;
-  font-family: 'Noto Sans SC', sans-serif;
-}
-.batch-delete {
-  padding: 16rpx 48rpx;
-  border-radius: 48rpx;
-  background: #A34A2E;
-}
-.batch-delete.disabled {
-  background: #CCCCCC;
-}
-.batch-delete text {
-  font-size: 28rpx;
-  color: #FFFFFF;
-  font-weight: 600;
-  font-family: 'Noto Sans SC', sans-serif;
 }
 
 /* Empty */
