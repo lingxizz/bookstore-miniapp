@@ -342,6 +342,10 @@ const panelBg = computed(() => {
   return map[config.value.theme] || '#F5F0EA';
 });
 
+const textColor = computed(() => {
+  return isDark.value ? 'rgba(204, 204, 204, 0.6)' : 'rgba(44, 44, 44, 0.5)';
+});
+
 const pageStyle = computed(() => {
   const map: Record<string, string> = {
     light: '#F5F0EA',
@@ -1007,14 +1011,14 @@ async function buyChapter() {
   z-index: 100;
   display: flex;
   align-items: center;
-  padding: 60rpx 32rpx 24rpx;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+  padding: 50rpx 24rpx 20rpx;
+  background: v-bind(panelBg);
   pointer-events: none;
 }
 .reader-info .back-btn {
   pointer-events: auto;
   font-size: 36rpx;
-  color: rgba(255, 255, 255, 0.7);
+  color: v-bind(textColor);
   padding: 8rpx;
   min-width: 60rpx;
 }
@@ -1022,8 +1026,7 @@ async function buyChapter() {
   flex: 1;
   text-align: center;
   font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.6);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  color: v-bind(textColor);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
