@@ -1206,17 +1206,23 @@ async function buyChapter() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 50rpx 24rpx 20rpx;
+  height: 88rpx;
+  padding: 0 24rpx;
+  padding-top: env(safe-area-inset-top);
   background: v-bind(panelBg);
   pointer-events: none;
 }
 .reader-info .back-btn {
   position: absolute;
   left: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: calc(env(safe-area-inset-top) / 2);
   pointer-events: auto;
   font-size: 36rpx;
   color: v-bind(textColor);
   padding: 8rpx;
+  line-height: 1;
 }
 .reader-info .chapter-title {
   font-size: 26rpx;
