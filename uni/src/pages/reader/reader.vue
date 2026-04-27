@@ -863,7 +863,17 @@ async function autoLoadPrev() {
     return;
   }
   if (loadingPrev.value) return;
+
+  // 付费未解锁：添加锁定占位
   if (!prevCh.isFree && !isUnlocked(prevCh.id)) {
+    sections.value.unshift({
+      chapterId: prevCh.id,
+      title: prevCh.title,
+      paragraphs: [],
+      locked: true,
+    });
+    // 更新已加载的最前面章节
+    earliestLoadedChapterId = prevCh.id;
     return;
   }
 
