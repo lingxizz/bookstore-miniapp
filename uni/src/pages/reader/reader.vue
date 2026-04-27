@@ -672,10 +672,23 @@ function getNextChapter() {
 }
 
 function getPrevChapter() {
-  // 使用已加载的最前面章节来找上一章
-  const refId = earliestLoadedChapterId || chapterId.value;
-  const idx = chapters.value.findIndex(c => c.id === refId);
-  return idx > 0 ? chapters.value[idx - 1] : null;
+  // 找到已加载章节中最前面的非锁定章节作为参考点
+  const unlockedSections = sections.value.filter(s => !s.locked);
+  if (unlockedSections.length === 0) return null;
+  
+  // 按章节顺序排序，找最前面的
+  const sortedSections = [...unlockedSections].sort((a, b) => {
+    const idxA = chapters.value.findIndex(c => c.id === a.chapterId);
+    const idxB = chapters.value.findIndex(c => c.id === b.chapterId);
+    return idxA - idxB;
+  });
+  
+  const frontmostSection = sortedSections[0];
+  const idx = chapters.value.findIndex(c => c.id === frontmostSection.chapterId);
+  if (idx <= 0) return null;
+  
+  // 找上一章
+  return chapters.value[idx - 1];
 }
 
 function getScrollEl() {
@@ -872,8 +885,6 @@ async function autoLoadPrev() {
       paragraphs: [],
       locked: true,
     });
-    // 更新已加载的最前面章节
-    earliestLoadedChapterId = prevCh.id;
     return;
   }
 
