@@ -63,6 +63,24 @@
     </view>
 
 
+    <!-- 章节导航条 -->
+    <view class="chapter-nav" :class="{ 'menu-hidden': !showMenu, 'menu-visible': showMenu }" @click.stop>
+      <view class="nav-btn" :class="{ disabled: !hasPrevChapter }" @click="goPrevChapter">
+        <text class="nav-icon">‹</text>
+        <text class="nav-label">上一章</text>
+      </view>
+      <view class="nav-progress" @touchstart="onProgressTouchStart" @touchmove="onProgressTouchMove" @touchend="onProgressTouchEnd">
+        <view class="progress-track">
+          <view class="progress-fill" :style="{ width: chapterProgressPercent + '%' }"></view>
+        </view>
+        <text class="progress-text">{{ currentChapterIndex + 1 }} / {{ chapters.length }}</text>
+      </view>
+      <view class="nav-btn" :class="{ disabled: !hasNextChapter }" @click="goNextChapter">
+        <text class="nav-label">下一章</text>
+        <text class="nav-icon">›</text>
+      </view>
+    </view>
+
     <!-- 底部栏 -->
     <view class="reader-bottom" :class="{ 'menu-hidden': !showMenu, 'menu-visible': showMenu }" @click.stop>
       <view class="bottom-item" @click="showCatalog = true">
@@ -428,6 +446,24 @@ const paragraphWrapStyle = computed(() => ({
 const currentTitle = computed(() => {
   const ch = chapters.value.find(c => c.id === chapterId.value);
   return ch?.title || bookTitle.value || '加载中...';
+});
+
+// 章节导航 computed
+const currentChapterIndex = computed(() => {
+  return chapters.value.findIndex(c => c.id === chapterId.value);
+});
+
+const hasPrevChapter = computed(() => {
+  return currentChapterIndex.value > 0;
+});
+
+const hasNextChapter = computed(() => {
+  return currentChapterIndex.value >= 0 && currentChapterIndex.value < chapters.value.length - 1;
+});
+
+const chapterProgressPercent = computed(() => {
+  if (chapters.value.length === 0) return 0;
+  return ((currentChapterIndex.value + 1) / chapters.value.length) * 100;
 });
 
 const chapterPrice = computed(() => {
@@ -939,6 +975,56 @@ function goBack() {
   uni.navigateBack();
 }
 
+// 章节导航方法
+function goPrevChapter() {
+  const idx = currentChapterIndex.value;
+  if (idx <= 0) return;
+  const prevCh = chapters.value[idx - 1];
+  if (prevCh) {
+    selectChapter(prevCh);
+  }
+}
+
+function goNextChapter() {
+  const idx = currentChapterIndex.value;
+  if (idx < 0 || idx >= chapters.value.length - 1) return;
+  const nextCh = chapters.value[idx + 1];
+  if (nextCh) {
+    selectChapter(nextCh);
+  }
+}
+
+// 进度条滑动跳转
+let progressTouchStartX = 0;
+let progressTrackWidth = 0;
+
+function onProgressTouchStart(e: any) {
+  progressTouchStartX = e.touches[0].clientX;
+  const track = e.currentTarget.querySelector('.progress-track');
+  progressTrackWidth = track?.offsetWidth || 0;
+}
+
+function onProgressTouchMove(e: any) {
+  if (!progressTrackWidth) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.touches[0].clientX - rect.left;
+  const percent = Math.max(0, Math.min(1, x / progressTrackWidth));
+  const targetIndex = Math.floor(percent * chapters.value.length);
+  // 实时更新显示（但不跳转，等 touchend）
+}
+
+function onProgressTouchEnd(e: any) {
+  if (!progressTrackWidth || chapters.value.length === 0) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.changedTouches[0].clientX - rect.left;
+  const percent = Math.max(0, Math.min(1, x / progressTrackWidth));
+  const targetIndex = Math.floor(percent * chapters.value.length);
+  const targetCh = chapters.value[Math.min(targetIndex, chapters.value.length - 1)];
+  if (targetCh && targetCh.id !== chapterId.value) {
+    selectChapter(targetCh);
+  }
+}
+
 const shelfLoading = ref(false);
 
 async function toggleShelf() {
@@ -1319,6 +1405,107 @@ async function buyChapter() {
   font-size: 20rpx;
   color: #888888;
   font-family: 'Noto Sans SC', sans-serif;
+}
+
+/* 章节导航条 */
+.chapter-nav {
+  position: fixed;
+  bottom: calc(100rpx + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+  background: rgba(245, 240, 234, 0.95);
+  backdrop-filter: blur(10rpx);
+  z-index: 51;
+  border-top: 1rpx solid #E8E2D8;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.35s ease;
+}
+.chapter-nav.menu-hidden {
+  transform: translateY(200%);
+  opacity: 0;
+  pointer-events: none;
+}
+.chapter-nav.menu-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.dark-mode .chapter-nav {
+  background: rgba(26, 26, 46, 0.95);
+  border-top-color: #333;
+}
+.reader-page.theme-white .chapter-nav {
+  background: rgba(255, 255, 255, 0.95);
+  border-top-color: #E8E8E8;
+}
+.reader-page.theme-green .chapter-nav {
+  background: rgba(232, 245, 233, 0.95);
+  border-top-color: #C8E6C9;
+}
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 8rpx 16rpx;
+}
+.nav-btn.disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+.nav-icon {
+  font-size: 32rpx;
+  color: #A34A2E;
+  font-weight: bold;
+}
+.dark-mode .nav-icon {
+  color: #C88A6B;
+}
+.nav-label {
+  font-size: 24rpx;
+  color: #666666;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .nav-label {
+  color: #AAAAAA;
+}
+.nav-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  margin: 0 24rpx;
+  padding: 8rpx 0;
+}
+.progress-track {
+  width: 100%;
+  height: 6rpx;
+  background: rgba(163, 74, 46, 0.15);
+  border-radius: 3rpx;
+  overflow: hidden;
+}
+.dark-mode .progress-track {
+  background: rgba(200, 138, 107, 0.2);
+}
+.progress-fill {
+  height: 100%;
+  background: #A34A2E;
+  border-radius: 3rpx;
+  transition: width 0.3s ease;
+}
+.dark-mode .progress-fill {
+  background: #C88A6B;
+}
+.progress-text {
+  font-size: 20rpx;
+  color: #888888;
+  font-family: 'Noto Sans SC', sans-serif;
+}
+.dark-mode .progress-text {
+  color: #AAAAAA;
 }
 
 /* 目录弹窗 */
